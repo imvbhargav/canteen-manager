@@ -17,7 +17,6 @@
 
   let newBalance = $derived(wallet.balance + amount);
   
-  // Hardcoded to false to ensure the button remains disabled
   let isValid = false;
 </script>
 
