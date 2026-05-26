@@ -4,7 +4,6 @@
 	import { goto } from '$app/navigation';
 
 	let name = $state('');
-	let studentId = $state('');
 	let rollNumber = $state('');
 	let pin = $state('');
 	let confirmPin = $state('');
@@ -13,9 +12,7 @@
 	let isLoading = $state(false);
 
 	let isPinMatching = $derived(pin.length === 4 && pin === confirmPin);
-	let isValid = $derived(
-		name.length > 2 && studentId.length >= 3 && rollNumber.length >= 2 && isPinMatching
-	);
+	let isValid = $derived(name.length > 2 && rollNumber.length >= 2 && isPinMatching);
 
 	async function handleRegister(e: Event) {
 		e.preventDefault();
@@ -28,7 +25,7 @@
 			const res = await fetch('/api/auth/register', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name, studentId, rollNumber, pin })
+				body: JSON.stringify({ name, rollNumber, pin })
 			});
 
 			const data = await res.json();
@@ -48,9 +45,9 @@
 </script>
 
 <svelte:head>
-    <title>Create Account | Campus Wallet</title>
-    <meta name="description" content="Set up your campus profile and digital wallet." />
-    <meta name="robots" content="noindex, nofollow" />
+	<title>Create Account | Campus Wallet</title>
+	<meta name="description" content="Set up your campus profile and digital wallet." />
+	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
 <div class="relative mx-auto flex h-dvh max-w-md flex-col overflow-hidden bg-background font-sans">
@@ -99,35 +96,19 @@
 				/>
 			</div>
 
-			<div class="grid grid-cols-2 gap-4">
-				<div class="space-y-2">
-					<label
-						for="studentId"
-						class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase"
-						>Student ID</label
-					>
-					<input
-						id="studentId"
-						type="text"
-						bind:value={studentId}
-						class="w-full border-b-2 border-border bg-transparent py-2 font-mono text-base text-foreground uppercase transition-colors outline-none placeholder:font-sans placeholder:font-light focus:border-foreground"
-						placeholder="STU-1044"
-					/>
-				</div>
-				<div class="space-y-2">
-					<label
-						for="rollNumber"
-						class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase"
-						>Roll No.</label
-					>
-					<input
-						id="rollNumber"
-						type="text"
-						bind:value={rollNumber}
-						class="w-full border-b-2 border-border bg-transparent py-2 font-mono text-base text-foreground transition-colors outline-none placeholder:font-sans placeholder:font-light focus:border-foreground"
-						placeholder="10445"
-					/>
-				</div>
+			<div class="space-y-2">
+				<label
+					for="rollNumber"
+					class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase"
+					>Roll No.</label
+				>
+				<input
+					id="rollNumber"
+					type="text"
+					bind:value={rollNumber}
+					class="w-full border-b-2 border-border bg-transparent py-2 font-mono text-base text-foreground transition-colors outline-none placeholder:font-sans placeholder:font-light focus:border-foreground"
+					placeholder="10445"
+				/>
 			</div>
 
 			<div class="space-y-6 pt-4">

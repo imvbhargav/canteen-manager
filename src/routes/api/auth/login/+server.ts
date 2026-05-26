@@ -1,22 +1,26 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { users, userSessions } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 import { generateSessionToken, hashSessionToken, verifyPin } from '$lib/server/auth';
 import type { RequestHandler } from './$types';
 import { dev } from '$app/environment';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
-    const { studentId, pin, deviceIdentifier = 'Web App' } = await request.json();
+    // Replaced studentId with a generic identifier
+    const { identifier, pin, deviceIdentifier = 'Web App' } = await request.json();
 
-    if (!studentId || !pin) {
+    if (!identifier || !pin) {
       return json({ success: false, error: 'Missing credentials' }, { status: 400 });
     }
 
-    // 1. Find User
+    // 1. Find User by checking both studentId and rollNumber
     const user = await db.query.users.findFirst({
-      where: eq(users.studentId, studentId)
+      where: or(
+        eq(users.studentId, identifier),
+        eq(users.rollNumber, identifier)
+      )
     });
 
     if (!user || !user.pinHash || !user.isActive) {
@@ -25,6 +29,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
     // 2. Verify PIN
     const isValid = verifyPin(pin, user.pinHash);
+    
     if (!isValid) {
       return json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
