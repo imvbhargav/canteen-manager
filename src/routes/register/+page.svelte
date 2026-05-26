@@ -47,6 +47,12 @@
 	}
 </script>
 
+<svelte:head>
+    <title>Create Account | Campus Wallet</title>
+    <meta name="description" content="Set up your campus profile and digital wallet." />
+    <meta name="robots" content="noindex, nofollow" />
+</svelte:head>
+
 <div class="relative mx-auto flex h-dvh max-w-md flex-col overflow-hidden bg-background font-sans">
 	<header class="flex items-center justify-between border-b border-border p-5">
 		<button
