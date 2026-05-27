@@ -145,7 +145,7 @@
 <svelte:head><title>Your Ticket | BPS Canteen</title></svelte:head>
 
 <div class="animate-in fade-in flex h-full flex-col duration-200">
-    <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background p-4 pt-1">
+    <header class="flex items-center gap-3 border-b border-border bg-background p-4 pt-1">
         <a href={resolve("/")} onclick={stopCamera} class="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <ArrowLeft size={18} />
         </a>
@@ -160,7 +160,7 @@
         {/if}
     </header>
 
-    <div class="flex-1">
+    <div class="flex-1 overflow-scroll">
     {#if appState.activeTicket}
         <div class="flex-1 space-y-4 overflow-y-auto p-4">
             <div class="flex items-center">
