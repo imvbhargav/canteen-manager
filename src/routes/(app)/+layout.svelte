@@ -104,7 +104,7 @@
 >
 	<div class="absolute top-0 right-0 left-0 z-50 h-px bg-border"></div>
 
-	<main class="relative z-0 flex-1 overflow-y-auto pt-3">
+	<main class="relative z-0 flex-1 overflow-y-auto pt-3 pb-20">
 		{@render children()}
 	</main>
 
@@ -146,9 +146,9 @@
 	{/if}
 
 	<nav
-		class="fixed bottom-0 z-40 w-full border-t border-border bg-background px-2 pt-3 pb-6 supports-[padding:max(0px)]:pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+		class="fixed left-0 bottom-0 z-40 w-full bg-background supports-[padding:max(0px)]:pb-[max(1rem,env(safe-area-inset-bottom))]"
 	>
-		<div class="mx-auto flex max-w-sm items-center justify-around">
+		<div class="mx-auto flex max-w-md items-center border-t px-2 pt-4 border-border justify-around">
 			{#each navItems as { path, icon: Icon, label } (path)}
 				{#if path !== resolve('/menu') || !appState.activeTicket}
 					<a
@@ -176,11 +176,6 @@
 							/>
 						{/if}
 						<span class="font-mono text-[9px] tracking-widest uppercase">{label}</span>
-						{#if currentPath === path || (path === '/profile' && currentPath.startsWith('/profile'))}
-							<span
-								class="absolute -bottom-3 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-foreground"
-							></span>
-						{/if}
 					</a>
 				{/if}
 			{/each}
