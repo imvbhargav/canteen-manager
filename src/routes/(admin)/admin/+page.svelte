@@ -1,55 +1,116 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import {
         Wallet,
         UtensilsCrossed,
         CheckCircle2,
         Loader2,
         AlertCircle,
-        LogOut, // 1. Imported LogOut icon
-		Plus
-
+        LogOut,
+        Plus,
+        Search,
+        Edit,
+        Save,
+        X,
+        Archive,
+        ArchiveRestore,
+        Package,
+        PackageX
     } from 'lucide-svelte';
     import { resolve } from '$app/paths';
-    import { goto } from '$app/navigation'; // 2. Imported for programmatic navigation
+    import { goto } from '$app/navigation';
 
-    // Tabs state
+    interface MenuItem {
+        id: string;
+        name: string;
+        description: string;
+        price: number;
+        category: string;
+        dietary: string;
+        inStock: boolean;
+        isArchived: boolean;
+    }
+
     let activeTab: 'menu' | 'wallet' = $state('menu');
 
-    // Menu Item State
-    let menuForm = $state({
+    let menuItemsList: MenuItem[] = $state([]);
+    let isFetchingMenu: boolean = $state(true); 
+    let searchQuery: string = $state('');
+    let showArchived: boolean = $state(false);
+    
+    let processingItemId: string | null = $state(null);
+    
+    let filteredMenu: MenuItem[] = $derived(
+        menuItemsList.filter(item => {
+            const matchesSearch: boolean = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                           item.category.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesArchiveStatus: boolean = showArchived ? true : !item.isArchived;
+            return matchesSearch && matchesArchiveStatus;
+        })
+    );
+
+    let menuForm: { name: string; description: string; price: string; category: string; dietary: string } = $state({
         name: '',
         description: '',
         price: '',
         category: 'Breakfast',
         dietary: 'veg'
     });
-    let isMenuSubmitting = $state(false);
-    let menuSuccessMsg = $state('');
+    let isMenuSubmitting: boolean = $state(false);
+    let menuSuccessMsg: string = $state('');
 
-    // Wallet Top-up State
-    let walletForm = $state({
-        identifier: '', // Uses Student ID or Roll Number
+    let editingId: string | null = $state(null);
+    let editForm: { name: string; description: string; price: string; category: string; dietary: string } = $state({
+        name: '', 
+        description: '', 
+        price: '', 
+        category: '', 
+        dietary: ''
+    });
+    let isEditSubmitting: boolean = $state(false);
+
+    let walletForm: { identifier: string; amount: string; provider: string; providerTxnId: string } = $state({
+        identifier: '',
         amount: '',
         provider: 'CASH',
         providerTxnId: ''
     });
-    let isWalletSubmitting = $state(false);
-    let walletSuccessMsg = $state('');
-    let walletErrorMsg = $state('');
+    let isWalletSubmitting: boolean = $state(false);
+    let walletSuccessMsg: string = $state('');
+    let walletErrorMsg: string = $state('');
 
-    // 3. New Logout Handler
-    let isLoggingOut = $state(false);
-    async function handleLogout() {
+    let isLoggingOut: boolean = $state(false);
+
+    onMount(() => {
+        fetchMenuItems(true);
+    });
+
+    async function fetchMenuItems(showSkeleton: boolean = true): Promise<void> {
+        if (showSkeleton) isFetchingMenu = true;
+        try {
+            const res: Response = await fetch('/api/menu?includeArchived=true');
+            const data = await res.json();
+            if (res.ok && data.success) {
+                menuItemsList = data.data;
+            }
+        } catch {
+            console.error('Failed to fetch menu items');
+        } finally {
+            if (showSkeleton) isFetchingMenu = false;
+        }
+    }
+
+    async function handleLogout(): Promise<void> {
         if (isLoggingOut) return;
         isLoggingOut = true;
         
         try {
-            const res = await fetch('/api/auth/logout', { method: 'POST' });
+            const res: Response = await fetch('/api/auth/logout', { method: 'POST' });
             if (res.ok) {
                 goto(resolve('/login'));
             } else {
                 console.error('Logout failed');
-                isLoggingOut = false; // Reset if it failed so they can try again
+                isLoggingOut = false;
             }
         } catch {
             console.error('Network error during logout');
@@ -57,12 +118,12 @@
         }
     }
 
-    async function handleAddMenuItem(e: Event) {
+    async function handleAddMenuItem(e: Event): Promise<void> {
         e.preventDefault();
         isMenuSubmitting = true;
 
         try {
-            const res = await fetch('/api/menu', {
+            const res: Response = await fetch('/api/menu', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -74,6 +135,7 @@
             if (res.ok) {
                 menuSuccessMsg = 'Item added to live menu';
                 menuForm = { name: '', description: '', price: '', category: 'Breakfast', dietary: 'veg' };
+                await fetchMenuItems(false);
                 setTimeout(() => (menuSuccessMsg = ''), 3000);
             }
         } catch {
@@ -83,18 +145,82 @@
         }
     }
 
-    async function handleWalletTopup(e: Event) {
+    function startEditing(item: MenuItem): void {
+        editingId = item.id;
+        editForm = { 
+            name: item.name, 
+            description: item.description, 
+            price: String(item.price), 
+            category: item.category, 
+            dietary: item.dietary 
+        };
+    }
+
+    function cancelEditing(): void {
+        editingId = null;
+    }
+
+    async function handleUpdateItem(e: Event): Promise<void> {
+        e.preventDefault();
+        isEditSubmitting = true;
+        if (editingId) processingItemId = editingId;
+        
+        try {
+            const res: Response = await fetch('/api/menu', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    id: editingId, 
+                    ...editForm, 
+                    price: Number(editForm.price) 
+                })
+            });
+
+            if (res.ok) {
+                await fetchMenuItems(false);
+                editingId = null;
+            }
+        } catch {
+            console.error('Failed to update item');
+        } finally {
+            isEditSubmitting = false;
+            processingItemId = null;
+        }
+    }
+
+    async function handleStatusToggle(id: string, payload: Partial<MenuItem>): Promise<void> {
+        if (processingItemId) return;
+        processingItemId = id;
+        
+        try {
+            const res: Response = await fetch('/api/menu', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, ...payload })
+            });
+
+            if (res.ok) {
+                await fetchMenuItems(false);
+            }
+        } catch {
+            console.error('Failed to update status');
+        } finally {
+            processingItemId = null;
+        }
+    }
+
+    async function handleWalletTopup(e: Event): Promise<void> {
         e.preventDefault();
         isWalletSubmitting = true;
         walletErrorMsg = '';
         walletSuccessMsg = '';
 
         try {
-            const res = await fetch('/api/wallet/topup', {
+            const res: Response = await fetch('/api/wallet/topup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    identifier: walletForm.identifier, // Send the Roll No / Student ID
+                    identifier: walletForm.identifier,
                     amount: Number(walletForm.amount),
                     provider: walletForm.provider,
                     providerTxnId: walletForm.providerTxnId || crypto.randomUUID()
@@ -121,9 +247,7 @@
 <svelte:head><title>Admin Console | BPS Canteen</title></svelte:head>
 
 <div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-200">
-    <header
-        class="z-20 flex shrink-0 items-center gap-3 border-b border-border bg-background p-4 pt-5 shadow-sm"
-    >
+    <header class="z-20 flex shrink-0 items-center gap-3 border-b border-border bg-background p-4 pt-5 shadow-sm">
         <div class="min-w-0 flex-1">
             <h2 class="text-base leading-none font-semibold tracking-tight text-foreground">
                 Admin Console
@@ -132,9 +256,7 @@
         <div class="flex items-center gap-3">
             <div class="flex items-center gap-1.5 border-r border-border pr-3">
                 <div class="status-dot"></div>
-                <span class="font-mono text-[10px] tracking-wider text-emerald-400 uppercase"
-                    >System Online</span
-                >
+                <span class="font-mono text-[10px] tracking-wider text-emerald-400 uppercase">System Online</span>
             </div>
             
             <button
@@ -174,6 +296,7 @@
     </div>
 
     <div class="flex-1 overflow-y-auto p-4 pb-12">
+        
         {#if activeTab === 'menu'}
             <form onsubmit={handleAddMenuItem} class="space-y-5">
                 <div class="space-y-1.5">
@@ -219,7 +342,7 @@
                         <label for="diet" class="label-mono">Dietary</label>
                         <select
                             disabled
-							id="diet"
+                            id="diet"
                             bind:value={menuForm.dietary}
                             class="w-full appearance-none border border-border bg-card px-3 py-2.5 text-sm text-foreground transition-colors focus:border-foreground focus:outline-none"
                         >
@@ -257,6 +380,135 @@
                     {/if}
                 </button>
             </form>
+
+            <div class="my-8 h-px bg-border"></div>
+
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-semibold tracking-tight text-foreground">Active Menu Items</h3>
+                    <label class="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
+                        <input type="checkbox" bind:checked={showArchived} class="accent-foreground" />
+                        Show Archived
+                    </label>
+                </div>
+                
+                <div class="relative">
+                    <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                    <input 
+                        type="text" 
+                        bind:value={searchQuery}
+                        placeholder="Search menu by name or category..." 
+                        class="w-full border border-border bg-card py-2.5 pl-10 pr-3 text-sm text-foreground transition-colors focus:border-foreground focus:outline-none"
+                    />
+                </div>
+
+                <div class="space-y-3">
+                    {#if isFetchingMenu}
+                        {#each Array.from({ length: 4 }, (_, i) => i) as i (i)}
+                            <div class="flex animate-pulse items-start justify-between gap-3 border border-border bg-card p-3">
+                                <div class="flex-1 space-y-2.5 py-1">
+                                    <div class="flex items-center gap-2">
+                                        <div class="h-4 w-32 rounded bg-muted"></div>
+                                        <div class="h-4 w-16 rounded bg-muted"></div>
+                                    </div>
+                                    <div class="h-3 w-3/4 rounded bg-muted/70"></div>
+                                    <div class="h-4 w-12 rounded bg-muted"></div>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-1">
+                                    <div class="h-8 w-8 rounded bg-muted"></div>
+                                    <div class="h-8 w-8 rounded bg-muted"></div>
+                                    <div class="h-8 w-8 rounded bg-muted"></div>
+                                </div>
+                            </div>
+                        {/each}
+                    {:else if filteredMenu.length === 0}
+                        <p class="border border-dashed border-border py-4 text-center text-sm text-muted-foreground">No items found.</p>
+                    {:else}
+                        {#each filteredMenu as item (item.id)}
+                            <div class="relative overflow-hidden border border-border bg-card p-3 transition-opacity {item.isArchived ? 'opacity-60' : ''} {processingItemId === item.id && !editingId ? 'pointer-events-none' : ''}">
+                                
+                                {#if processingItemId === item.id && !editingId}
+                                    <div class="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-[1px]">
+                                        <Loader2 size={24} class="animate-spin text-foreground" />
+                                    </div>
+                                {/if}
+
+                                {#if editingId === item.id}
+                                    <form onsubmit={handleUpdateItem} class="space-y-3">
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="text" bind:value={editForm.name} required class="w-full border border-border bg-background px-2 py-1.5 text-sm" placeholder="Name" />
+                                            <input type="number" step="0.01" bind:value={editForm.price} required class="w-full border border-border bg-background px-2 py-1.5 font-mono text-sm" placeholder="Price" />
+                                        </div>
+                                        <input type="text" bind:value={editForm.description} required class="w-full border border-border bg-background px-2 py-1.5 text-sm" placeholder="Description" />
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <select bind:value={editForm.category} class="w-full border border-border bg-background px-2 py-1.5 text-sm">
+                                                <option value="Breakfast">Breakfast</option>
+                                                <option value="Lunch">Lunch</option>
+                                                <option value="Snacks">Snacks</option>
+                                                <option value="Beverages">Beverages</option>
+                                            </select>
+                                            <div class="flex gap-2">
+                                                <button type="button" onclick={cancelEditing} class="flex flex-1 items-center justify-center border border-border text-muted-foreground transition-colors hover:bg-muted">
+                                                    <X size={16} />
+                                                </button>
+                                                <button type="submit" disabled={isEditSubmitting} class="flex flex-1 items-center justify-center bg-foreground text-background transition-transform active:scale-[0.98] disabled:opacity-50">
+                                                    {#if isEditSubmitting}
+                                                        <Loader2 size={16} class="animate-spin" />
+                                                    {:else}
+                                                        <Save size={16} />
+                                                    {/if}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                {:else}
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <h4 class="text-sm font-medium text-foreground {item.isArchived ? 'line-through' : ''}">{item.name}</h4>
+                                                <span class="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground uppercase">{item.category}</span>
+                                            </div>
+                                            <p class="mt-1 line-clamp-1 text-xs text-muted-foreground">{item.description}</p>
+                                            <p class="mt-1.5 font-mono text-sm text-foreground">₹{item.price}</p>
+                                        </div>
+                                        <div class="flex shrink-0 items-center gap-1">
+                                            <button 
+                                                onclick={() => handleStatusToggle(item.id, { inStock: !item.inStock })} 
+                                                class="p-2 transition-colors {!item.inStock && !item.isArchived ? 'text-destructive' : 'text-muted-foreground hover:text-foreground'}" 
+                                                title={item.inStock ? 'Mark Out of Stock' : 'Mark In Stock'}
+                                            >
+                                                {#if item.inStock}
+                                                    <PackageX size={16} />
+                                                {:else}
+                                                    <Package size={16} />
+                                                {/if}
+                                            </button>
+                                            <button 
+                                                onclick={() => handleStatusToggle(item.id, { isArchived: !item.isArchived })} 
+                                                class="p-2 transition-colors {item.isArchived ? 'text-amber-500' : 'text-muted-foreground hover:text-foreground'}" 
+                                                title={item.isArchived ? 'Restore Item' : 'Archive Item'}
+                                            >
+                                                {#if item.isArchived}
+                                                    <ArchiveRestore size={16} />
+                                                {:else}
+                                                    <Archive size={16} />
+                                                {/if}
+                                            </button>
+                                            <button 
+                                                onclick={() => startEditing(item)} 
+                                                class="p-2 text-muted-foreground transition-colors hover:text-foreground" 
+                                                title="Edit Item"
+                                            >
+                                                <Edit size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                {/if}
+                            </div>
+                        {/each}
+                    {/if}
+                </div>
+            </div>
         {/if}
 
         {#if activeTab === 'wallet'}
