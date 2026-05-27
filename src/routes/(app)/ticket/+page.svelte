@@ -160,6 +160,7 @@
         {/if}
     </header>
 
+    <div class="flex-1">
     {#if appState.activeTicket}
         <div class="flex-1 space-y-4 overflow-y-auto p-4">
             <div class="flex items-center">
@@ -310,6 +311,7 @@
             </div>
         </div>
     {/if}
+    </div>
 </div>
 
 <style>
