@@ -20,13 +20,17 @@
 	} = $props();
 
 	onMount(() => {
-		const setHeight = () => {
-			document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
-		}
-		setHeight()
-		window.addEventListener('resize', setHeight)
-		return () => window.removeEventListener('resize', setHeight)
-	})
+    const setHeight = () => {
+        const nav = document.getElementById('bottom-nav');
+        const navHeight = nav ? nav.offsetHeight : 0; 
+        
+        document.documentElement.style.setProperty('--app-height', `${window.innerHeight - navHeight}px`);
+    }
+    
+    setHeight();
+    window.addEventListener('resize', setHeight);
+    return () => window.removeEventListener('resize', setHeight);
+});
 
 	$effect(() => {
 		if (data.wallet && !appState.wallet) appState.wallet = data.wallet;
@@ -109,7 +113,7 @@
 </svelte:head>
 
 <div
-	class="relative mx-auto flex h-[90dvh] max-w-md flex-col overflow-hidden font-sans"
+	class="relative mx-auto flex h-(--app-height) max-w-md flex-col overflow-hidden font-sans"
 >
 	<main class="relative z-0 flex-1 overflow-y-auto pt-3 border-x border-neutral-400/25">
 		{@render children()}
@@ -153,7 +157,8 @@
 	{/if}
 
 	<nav
-		class="fixed left-0 bottom-0 z-40 w-full bg-background opacity-10"
+		id='bottom-nav'
+		class="fixed left-0 bottom-0 z-40 w-full bg-background"
 	>
 		<div class="mx-auto flex max-w-md border-x border-neutral-400/25 items-center border-t px-2 pt-4 supports-[padding:max(0px)]:pb-[max(1rem,env(safe-area-inset-bottom))] justify-around">
 			{#each navItems as { path, icon: Icon, label } (path)}

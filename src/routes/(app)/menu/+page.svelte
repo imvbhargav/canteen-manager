@@ -191,7 +191,7 @@
         {/each}
     </div>
 
-    <div class="shrink-0 z-30 border-t border-border bg-background p-4 pb-22 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] supports-[padding:max(0px)]:pb-[max(5.5rem,calc(4.5rem+env(safe-area-inset-bottom)))]">
+    <div class="shrink-0 z-30 border-t border-border bg-background p-4 shadow-[0_-8px_20px_rgba(0,0,0,0.08)]">
         <div class="mb-3 flex items-center justify-between">
             <div>
                 <p class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
