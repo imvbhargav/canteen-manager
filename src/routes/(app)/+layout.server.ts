@@ -4,7 +4,14 @@ import { users, menuItems } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import type { LayoutServerLoad } from './$types';
 
-export const load: LayoutServerLoad = async ({ locals }) => {
+export const load: LayoutServerLoad = async ({ locals, setHeaders }) => {
+  // Prevent browser from caching this HTML page
+  setHeaders({
+    'cache-control': 'no-cache, no-store, must-revalidate',
+    'pragma': 'no-cache',
+    'expires': '0'
+  });
+
   if (!locals.user) {
     throw redirect(302, '/login');
   }
