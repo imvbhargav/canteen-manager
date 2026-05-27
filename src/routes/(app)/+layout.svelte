@@ -106,7 +106,7 @@
 
 	<main class="relative z-0 flex-1 overflow-y-auto pt-3 border-x border-neutral-400/25">
 		{@render children()}
-		<div class="h-20 w-full mt-4"></div>
+		<div class="h-20 w-full mt-4 bg-red-500"></div>
 	</main>
 
 	<!-- Custom PWA Install Banner -->
