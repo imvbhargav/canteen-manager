@@ -2,6 +2,16 @@
 	import { ArrowLeft, Loader2, Check } from 'lucide-svelte';
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
+
+	onMount(() => {
+		const setHeight = () => {
+			document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+		}
+		setHeight()
+		window.addEventListener('resize', setHeight)
+		return () => window.removeEventListener('resize', setHeight)
+	})
 
 	let name = $state('');
 	let rollNumber = $state('');
@@ -50,7 +60,7 @@
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<div class="relative mx-auto flex h-dvh max-w-md flex-col overflow-hidden bg-background font-sans border-x border-neutral-400/25">
+<div class="relative mx-auto flex h-[--app-height] max-w-md flex-col overflow-hidden bg-background font-sans border-x border-neutral-400/25">
 	<header class="flex items-center justify-between border-b border-border p-5">
 		<button
 			onclick={() => goto(resolve('/login'))}

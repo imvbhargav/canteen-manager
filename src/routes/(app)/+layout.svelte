@@ -6,7 +6,7 @@
 	import { appState } from '$lib/store.svelte';
 	import { resolve } from '$app/paths';
 	import type { UserWallet, MenuItem } from '$lib/types';
-	import { type Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 
 	let {
 		data,
@@ -18,6 +18,15 @@
 		};
 		children: Snippet;
 	} = $props();
+
+	onMount(() => {
+		const setHeight = () => {
+			document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+		}
+		setHeight()
+		window.addEventListener('resize', setHeight)
+		return () => window.removeEventListener('resize', setHeight)
+	})
 
 	$effect(() => {
 		if (data.wallet && !appState.wallet) appState.wallet = data.wallet;
@@ -100,13 +109,11 @@
 </svelte:head>
 
 <div
-	class="relative mx-auto flex h-dvh max-w-md flex-col overflow-hidden bg-background font-sans"
+	class="relative mx-auto flex h-[--app-height] max-w-md flex-col overflow-hidden bg-background font-sans"
 >
-	<div class="absolute top-0 right-0 left-0 z-50 h-px bg-border"></div>
-
 	<main class="relative z-0 flex-1 overflow-y-auto pt-3 border-x border-neutral-400/25">
 		{@render children()}
-		<div class="h-20 w-full mt-4 bg-red-500"></div>
+		<div class="h-20 w-full mt-4"></div>
 	</main>
 
 	<!-- Custom PWA Install Banner -->

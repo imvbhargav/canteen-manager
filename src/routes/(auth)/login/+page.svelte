@@ -2,6 +2,16 @@
     import { ArrowRight, Loader2, Fingerprint } from 'lucide-svelte';
     import { goto, invalidateAll } from '$app/navigation'; 
     import { resolve } from '$app/paths';
+	import { onMount } from 'svelte';
+
+	onMount(() => {
+		const setHeight = () => {
+			document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+		}
+		setHeight()
+		window.addEventListener('resize', setHeight)
+		return () => window.removeEventListener('resize', setHeight)
+	})
 
     let identifier: string = $state('');
     let pin: string = $state('');
@@ -53,7 +63,7 @@
     }
 </script>
 
-<div class="relative mx-auto flex h-dvh max-w-md flex-col overflow-hidden bg-background pt-12 font-sans border-x border-neutral-400/25">
+<div class="relative mx-auto flex h-[--app-height] max-w-md flex-col overflow-hidden bg-background pt-12 font-sans border-x border-neutral-400/25">
     <div class="flex flex-1 flex-col px-6">
         <div class="mb-12">
             <h1 class="mb-2 text-3xl leading-none font-bold tracking-tight text-foreground">
