@@ -3,7 +3,6 @@
 
 import { build, files, version } from '$service-worker';
 
-// Override TypeScript's default Window context for 'self'
 declare const self: ServiceWorkerGlobalScope;
 
 const CACHE = `bps-canteen-cache-${version}`;
@@ -38,11 +37,29 @@ self.addEventListener('activate', (event: ExtendableEvent) => {
 });
 
 self.addEventListener('fetch', (event: FetchEvent) => {
+    // Ignore non-GET requests (POST, PUT, DELETE should always go to network)
     if (event.request.method !== 'GET') return;
 
     const url = new URL(event.request.url);
+    
+    // Ignore third-party requests
     if (url.origin !== self.location.origin) return;
 
+    // BYPASS CACHE FOR ALL API CALLS (Data must be fresh)
+    if (url.pathname.startsWith('/api/')) {
+        // By returning early, we let the browser fetch this normally.
+        return; 
+    }
+
+    // Handle Navigation (HTML page loads) - Network first, fallback to offline index
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request).catch(() => caches.match('/index.html') as Promise<Response>)
+        );
+        return;
+    }
+
+    // Handle UI Assets (JS, CSS, Images) - Cache first, fallback to network
     async function respond() {
         const cache = await caches.open(CACHE);
 
@@ -59,7 +76,6 @@ self.addEventListener('fetch', (event: FetchEvent) => {
             return networkResponse;
             
         } catch {
-            // Removed unused 'err' parameter to satisfy ESLint
             return new Response('Network error and no cache available', { status: 408 });
         }
     }
