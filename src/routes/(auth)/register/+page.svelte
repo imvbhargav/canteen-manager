@@ -60,7 +60,7 @@
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<div class="relative mx-auto flex h-[--app-height] max-w-md flex-col overflow-hidden bg-background font-sans border-x border-neutral-400/25">
+<div class="relative mx-auto flex h-[var(--app-height)] max-w-md flex-col overflow-hidden bg-background font-sans border-x border-neutral-400/25">
 	<header class="flex items-center justify-between border-b border-border p-5">
 		<button
 			onclick={() => goto(resolve('/login'))}

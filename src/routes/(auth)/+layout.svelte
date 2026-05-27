@@ -14,6 +14,6 @@
 	})
 </script>
 
-<main class="h-[--app-height] overflow-hidden">
+<main class="h-[var(--app-height)] overflow-hidden">
     {@render children()}
 </main>

@@ -109,7 +109,7 @@
 </svelte:head>
 
 <div
-	class="relative mx-auto flex h-[--app-height] max-w-md flex-col overflow-hidden bg-background font-sans"
+	class="relative mx-auto flex h-[var(--app-height)] max-w-md flex-col overflow-hidden bg-background font-sans"
 >
 	<main class="relative z-0 flex-1 overflow-y-auto pt-3 border-x border-neutral-400/25">
 		{@render children()}
