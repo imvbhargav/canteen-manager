@@ -64,7 +64,7 @@
 <svelte:head><title>Account Profile | Campus Wallet</title></svelte:head>
 
 <div class="flex flex-col h-full animate-in fade-in duration-200">
-    <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background pt-1 pb-4">
+    <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background p-4 pt-1">
         <a href={resolve("/")} class="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <ArrowLeft size={18} />
         </a>
@@ -72,7 +72,7 @@
     </header>
 
     {#if appState.wallet}
-        <div class="flex-1 overflow-y-auto py-5 space-y-4 pb-6 animate-in slide-in-from-left-2 duration-300">
+        <div class="flex-1 overflow-y-auto py-5 space-y-4 pb-6 animate-in slide-in-from-left-2 duration-300 p-4">
             <div class="bg-card border border-border p-5 flex items-center gap-4">
                 <div class="w-12 h-12 border border-border flex items-center justify-center shrink-0">
                     <span class="font-mono text-lg font-medium text-foreground">{appState.wallet.name.charAt(0)}</span>
@@ -132,8 +132,8 @@
             </div>
 
             <div class="flex justify-between items-center px-1">
-                <span class="font-mono text-[10px] text-muted-foreground/50 uppercase tracking-widest">Nexus Bites v2.1.0</span>
-                <span class="font-mono text-[10px] text-muted-foreground/50 uppercase tracking-widest">Shivamogga</span>
+                <span class="font-mono text-[10px] text-muted-foreground/50 uppercase tracking-widest">BPS Canteen v0.0.2</span>
+                <span class="font-mono text-[10px] text-muted-foreground/50 uppercase tracking-widest">Bangalore</span>
             </div>
 
             <button onclick={executeLogout} class="w-full py-3.5 border border-destructive/25 text-destructive text-sm font-medium tracking-wide flex items-center justify-center gap-2 hover:bg-destructive/5 transition-colors active:scale-[0.98]">

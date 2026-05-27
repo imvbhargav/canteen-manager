@@ -43,7 +43,7 @@
 
 <div class="animate-in fade-in flex h-full flex-col duration-200">
 	<header
-		class="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background pt-1 pb-4"
+		class="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background p-4 pt-1"
 	>
 		<a
 			href={resolve('/profile')}
@@ -55,7 +55,7 @@
 		</div>
 	</header>
 
-	<div class="animate-in slide-in-from-right-2 flex-1 overflow-y-auto py-5 duration-300">
+	<div class="animate-in slide-in-from-right-2 flex-1 overflow-y-auto p-4 duration-300">
 		<div class="divide-y divide-border border border-border bg-card">
 			{#if isLoadingHistory}
 				{#each [1, 2, 3, 4, 5] as i (i)}

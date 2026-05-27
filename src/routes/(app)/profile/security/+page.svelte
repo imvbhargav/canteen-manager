@@ -24,12 +24,12 @@
 <svelte:head><title>Security | Campus Wallet</title></svelte:head>
 
 <div class="flex flex-col h-full animate-in fade-in duration-200">
-    <header class="flex items-center gap-3 pb-4 border-b border-border sticky top-0 bg-background z-10 pt-1">
+    <header class="flex items-center gap-3 pb-4 border-b border-border sticky top-0 bg-background z-10 pt-1 p-4">
         <a href={resolve("/profile")} class="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"><ArrowLeft size={18} /></a>
         <div><h2 class="text-base font-semibold text-foreground tracking-tight leading-none">Security</h2></div>
     </header>
 
-    <div class="flex-1 overflow-y-auto py-5 space-y-6 animate-in slide-in-from-right-2 duration-300">
+    <div class="flex-1 overflow-y-auto p-4 space-y-6 animate-in slide-in-from-right-2 duration-300">
         <div>
             <p class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2 px-1">Authentication</p>
             <div class="bg-card border border-border divide-y divide-border">

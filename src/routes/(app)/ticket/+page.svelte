@@ -145,7 +145,7 @@
 <svelte:head><title>Your Ticket | BPS Canteen</title></svelte:head>
 
 <div class="animate-in fade-in flex h-full flex-col duration-200">
-    <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background pt-1 pb-4">
+    <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background p-4 pt-1">
         <a href={resolve("/")} onclick={stopCamera} class="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <ArrowLeft size={18} />
         </a>
@@ -161,7 +161,7 @@
     </header>
 
     {#if appState.activeTicket}
-        <div class="flex-1 space-y-4 overflow-y-auto py-5">
+        <div class="flex-1 space-y-4 overflow-y-auto p-4">
             <div class="flex items-center">
                 <div class="flex items-center gap-2">
                     <div class="flex h-5 w-5 shrink-0 items-center justify-center border border-emerald-500">
@@ -302,7 +302,7 @@
             </div>
         </div>
     {:else}
-        <div class="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+        <div class="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
             <div class="flex h-16 w-16 items-center justify-center border border-border"><QrCode size={28} class="text-muted-foreground" strokeWidth={1} /></div>
             <div>
                 <h3 class="text-base font-medium text-foreground">No Active Orders</h3>

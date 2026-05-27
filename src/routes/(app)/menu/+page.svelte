@@ -90,7 +90,7 @@
 
 <div class="animate-in fade-in flex h-full flex-col duration-200">
 	<header
-		class="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background pt-1 pb-4"
+		class="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background p-4 pt-1"
 	>
 		<a
 			href={resolve('/')}
@@ -111,7 +111,7 @@
 		{/if}
 	</header>
 
-	<div class="flex-1 space-y-6 overflow-y-auto py-4">
+	<div class="flex-1 space-y-6 overflow-y-auto p-4">
 		{#each groupedMenu() as group (group.category)}
 			<div>
 				<div class="mb-3 flex items-center gap-3">
@@ -190,7 +190,7 @@
 		{/each}
 	</div>
 
-	<div class="z-20 border-t border-border bg-background pt-4 pb-2">
+	<div class="z-20 border-t border-border bg-background p-4 pb-2">
 		<div class="mb-3 flex items-center justify-between">
 			<div>
 				<p class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">

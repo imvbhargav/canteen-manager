@@ -113,7 +113,7 @@
 >
 	<div class="absolute top-0 right-0 left-0 z-50 h-px bg-border"></div>
 
-	<main class="relative z-0 flex-1 overflow-y-auto px-5 pt-6 pb-28">
+	<main class="relative z-0 flex-1 overflow-y-auto pt-3">
 		{@render children()}
 	</main>
 
@@ -155,7 +155,7 @@
 	{/if}
 
 	<nav
-		class="absolute bottom-0 z-40 w-full border-t border-border bg-background px-2 pt-3 pb-6 supports-[padding:max(0px)]:pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+		class="fixed bottom-0 z-40 w-full border-t border-border bg-background px-2 pt-3 pb-6 supports-[padding:max(0px)]:pb-[max(1.5rem,env(safe-area-inset-bottom))]"
 	>
 		<div class="mx-auto flex max-w-sm items-center justify-around">
 			{#each navItems as { path, icon: Icon, label } (path)}

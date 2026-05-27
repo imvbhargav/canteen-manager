@@ -13,14 +13,14 @@
 <svelte:head><title>Add Funds | Campus Wallet</title></svelte:head>
 
 <div class="flex flex-col h-full animate-in fade-in duration-200">
-    <header class="flex items-center gap-3 pb-4 border-b border-border sticky top-0 bg-background z-10 pt-1">
+    <header class="flex items-center gap-3 pb-4 border-b border-border sticky top-0 bg-background z-10 pt-1 p-4">
         <a href={resolve("/")} class="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             <ArrowLeft size={18} />
         </a>
         <div><h2 class="text-base font-semibold text-foreground tracking-tight leading-none">Add Funds</h2></div>
     </header>
 
-    <div class="flex-1 overflow-y-auto py-5 space-y-4">
+    <div class="flex-1 overflow-y-auto p-4 space-y-4">
         <div class="flex justify-between items-center px-5 py-4 bg-card border border-border">
             <span class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Current Balance</span>
             <span class="font-mono text-sm text-foreground">₹{appState.wallet?.balance.toFixed(2) || '0.00'}</span>
@@ -60,7 +60,7 @@
         </div>
     </div>
 
-    <div class="pt-4 border-t border-border bg-background pb-2">
+    <div class="pt-4 border-t border-border bg-background pb-2 p-4">
         <button disabled class="w-full py-3.5 bg-muted text-muted-foreground border border-border text-sm font-medium tracking-wide transition-all cursor-not-allowed">Top-up Disabled</button>
     </div>
 </div>
