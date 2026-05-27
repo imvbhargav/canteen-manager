@@ -12,6 +12,8 @@ import {
 import { relations, sql } from 'drizzle-orm';
 
 // ENUMS
+export const userRoleEnum = pgEnum('user_role', ['STUDENT', 'STAFF', 'ADMIN']);
+
 export const categoryEnum = pgEnum('menu_category', ['Breakfast', 'Lunch', 'Snacks', 'Beverages']);
 export const dietaryEnum = pgEnum('dietary_type', ['veg', 'non-veg']);
 export const ticketStatusEnum = pgEnum('ticket_status', ['PENDING', 'READY', 'COMPLETED', 'CANCELLED']);
@@ -30,18 +32,13 @@ export const users = pgTable(
     studentId: text('student_id').notNull().unique(), 
     name: text('name').notNull(),
     rollNumber: text('roll_number').notNull().unique(),
+    role: userRoleEnum('role').default('STUDENT').notNull(),
     balance: numeric('balance', { precision: 10, scale: 2 }).notNull().default('0.00'),
-    
-    // Security (Mapped to UI)
-    pinHash: text('pin_hash'), // Nullable initially until user sets it
+    pinHash: text('pin_hash'),
     biometricsEnabled: boolean('biometrics_enabled').default(false).notNull(),
-    
-    // Notifications (Mapped to UI)
     notifyOrders: boolean('notify_orders').default(true).notNull(),
     notifyWallet: boolean('notify_wallet').default(true).notNull(),
     notifyPromo: boolean('notify_promo').default(false).notNull(),
-    
-    // Status
     isActive: boolean('is_active').default(true).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

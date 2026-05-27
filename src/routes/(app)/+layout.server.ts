@@ -22,7 +22,8 @@ export const load: LayoutServerLoad = async ({ locals, setHeaders }) => {
       studentId: true,
       name: true,
       rollNumber: true,
-      balance: true
+      balance: true,
+      role: true // 1. Must fetch the role to check it
     }
   });
 
@@ -30,6 +31,12 @@ export const load: LayoutServerLoad = async ({ locals, setHeaders }) => {
     throw redirect(302, '/login');
   }
 
+  // 2. Intercept Admins and send them to their console immediately
+  if (user.role === 'ADMIN') {
+    throw redirect(302, '/admin');
+  }
+
+  // 3. Only standard students proceed to fetch the menu
   const menu = await db.query.menuItems.findMany({
     where: eq(menuItems.isArchived, false),
     orderBy: (menuItems, { asc }) => [asc(menuItems.category), asc(menuItems.name)]

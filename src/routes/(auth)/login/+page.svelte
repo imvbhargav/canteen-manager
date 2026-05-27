@@ -3,15 +3,21 @@
     import { goto, invalidateAll } from '$app/navigation'; 
     import { resolve } from '$app/paths';
 
-    let identifier = $state('');
-    let pin = $state('');
-    let errorMsg = $state('');
-    let isLoading = $state(false);
+    let identifier: string = $state('');
+    let pin: string = $state('');
+    let errorMsg: string = $state('');
+    let isLoading: boolean = $state(false);
 
-    // Minimum length for a roll number is usually 2+ characters
-    let isValid = $derived(identifier.length >= 2 && pin.length === 4);
+    let isValid: boolean = $derived(identifier.length >= 2 && pin.length === 4);
 
-    async function handleLogin(e: Event) {
+    type LoginResponse = {
+        success: boolean;
+        error?: string;
+        message?: string;
+        role?: 'STUDENT' | 'STAFF' | 'ADMIN';
+    };
+
+    async function handleLogin(e: Event): Promise<void> {
         e.preventDefault();
         if (!isValid || isLoading) return;
 
@@ -25,17 +31,21 @@
                 body: JSON.stringify({ identifier, pin })
             });
 
-            const data = await res.json();
+            const data = (await res.json()) as LoginResponse;
 
             if (data.success) {
                 await invalidateAll(); 
-                await goto(resolve('/'));       
+                
+                if (data.role === 'ADMIN') {
+                    await goto(resolve('/admin'));
+                } else {
+                    await goto(resolve('/'));
+                }
             } else {
                 errorMsg = data.error || 'Login failed';
                 pin = ''; 
             }
-        } catch (err: unknown) {
-            console.error('Login error:', err);
+        } catch {
             errorMsg = 'Network error. Please try again.';
         } finally {
             isLoading = false;
@@ -43,9 +53,7 @@
     }
 </script>
 
-<div
-    class="relative mx-auto flex h-dvh max-w-md flex-col overflow-hidden bg-background pt-12 font-sans"
->
+<div class="relative mx-auto flex h-dvh max-w-md flex-col overflow-hidden bg-background pt-12 font-sans border-x border-neutral-400/25">
     <div class="flex flex-1 flex-col px-6">
         <div class="mb-12">
             <h1 class="mb-2 text-3xl leading-none font-bold tracking-tight text-foreground">
@@ -64,11 +72,7 @@
             {/if}
 
             <div class="space-y-2">
-                <label
-                    for="identifier"
-                    class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase"
-                    >Student ID or Roll No.</label
-                >
+                <label for="identifier" class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">Student ID or Roll No.</label>
                 <input
                     id="identifier"
                     type="text"
@@ -80,11 +84,7 @@
             </div>
 
             <div class="space-y-2">
-                <label
-                    for="pin"
-                    class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase"
-                    >4-Digit PIN</label
-                >
+                <label for="pin" class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">4-Digit PIN</label>
                 <input
                     id="pin"
                     type="password"

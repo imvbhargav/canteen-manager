@@ -54,10 +54,10 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 						method: 'GET',
 						headers: event.request.headers,
 						credentials: 'same-origin',
-						cache: 'no-store'
+						cache: 'no-store',
+						redirect: 'manual'
 					});
 				} catch {
-					// <-- Removed (error)
 					// Network failed (likely Android cold-start drop). Wait 500ms and retry.
 					try {
 						await new Promise((resolve) => setTimeout(resolve, 500));
@@ -65,10 +65,10 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 							method: 'GET',
 							headers: event.request.headers,
 							credentials: 'same-origin',
-							cache: 'no-store'
+							cache: 'no-store',
+							redirect: 'manual'
 						});
 					} catch {
-						// <-- Removed (retryError)
 						// Only serve offline cache if it genuinely fails twice
 						const cachedFallback = await caches.match('/index.html');
 						return cachedFallback || new Response('Offline', { status: 503 });

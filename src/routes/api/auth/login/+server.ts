@@ -8,33 +8,39 @@ import { dev } from '$app/environment';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
   try {
-    // Replaced studentId with a generic identifier
-    const { identifier, pin, deviceIdentifier = 'Web App' } = await request.json();
+    const { identifier, pin, deviceIdentifier = 'Web App' } = await request.json() as {
+      identifier: string;
+      pin: string;
+      deviceIdentifier?: string;
+    };
 
     if (!identifier || !pin) {
       return json({ success: false, error: 'Missing credentials' }, { status: 400 });
     }
 
-    // 1. Find User by checking both studentId and rollNumber
     const user = await db.query.users.findFirst({
       where: or(
         eq(users.studentId, identifier),
         eq(users.rollNumber, identifier)
-      )
+      ),
+      columns: {
+        id: true,
+        pinHash: true,
+        isActive: true,
+        role: true
+      }
     });
 
     if (!user || !user.pinHash || !user.isActive) {
       return json({ success: false, error: 'Invalid credentials or account disabled' }, { status: 401 });
     }
 
-    // 2. Verify PIN
     const isValid = verifyPin(pin, user.pinHash);
     
     if (!isValid) {
       return json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // 3. Create Session
     const sessionToken = generateSessionToken();
     const tokenHash = hashSessionToken(sessionToken);
 
@@ -45,7 +51,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       isRevoked: false
     });
 
-    // 4. Set Secure Cookie
     cookies.set('session_id', sessionToken, {
       path: '/',
       httpOnly: true,
@@ -54,9 +59,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       maxAge: 60 * 60 * 24 * 7
     });
 
-    return json({ success: true, message: 'Logged in successfully' });
-  } catch (error: unknown) {
-    console.error('Login error:', error);
+    return json({ success: true, role: user.role, message: 'Logged in successfully' });
+  } catch {
     return json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
 };

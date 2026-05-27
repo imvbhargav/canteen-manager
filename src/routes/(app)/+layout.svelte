@@ -104,8 +104,9 @@
 >
 	<div class="absolute top-0 right-0 left-0 z-50 h-px bg-border"></div>
 
-	<main class="relative z-0 flex-1 overflow-y-auto pt-3 pb-20">
+	<main class="relative z-0 flex-1 overflow-y-auto pt-3 border-x border-neutral-400/25">
 		{@render children()}
+		<div class="h-20 w-full mt-4"></div>
 	</main>
 
 	<!-- Custom PWA Install Banner -->
@@ -146,9 +147,9 @@
 	{/if}
 
 	<nav
-		class="fixed left-0 bottom-0 z-40 w-full bg-background supports-[padding:max(0px)]:pb-[max(1rem,env(safe-area-inset-bottom))]"
+		class="fixed left-0 bottom-0 z-40 w-full bg-background"
 	>
-		<div class="mx-auto flex max-w-md items-center border-t px-2 pt-4 border-border justify-around">
+		<div class="mx-auto flex max-w-md border-x border-neutral-400/25 items-center border-t px-2 pt-4 supports-[padding:max(0px)]:pb-[max(1rem,env(safe-area-inset-bottom))] justify-around">
 			{#each navItems as { path, icon: Icon, label } (path)}
 				{#if path !== resolve('/menu') || !appState.activeTicket}
 					<a

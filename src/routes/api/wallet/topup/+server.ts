@@ -1,18 +1,34 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { eq, sql } from 'drizzle-orm';
+import { eq, or, sql } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { users, payments, walletTransactions } from '$lib/server/db/schema';
 
 export const POST: RequestHandler = async ({ request }) => {
-  // In production, ensure this endpoint is highly secured/authenticated
-  const { userId, amount, providerTxnId, provider } = await request.json();
+  // Now expecting 'identifier' instead of 'userId'
+  const { identifier, amount, providerTxnId, provider } = await request.json();
 
+  if (!identifier) return json({ success: false, error: 'Student ID or Roll Number required' }, { status: 400 });
   if (amount <= 0) return json({ success: false, error: 'Invalid amount' }, { status: 400 });
 
   try {
+    // 1. Look up the user by Student ID or Roll Number
+    const targetUser = await db.query.users.findFirst({
+      where: or(
+        eq(users.studentId, identifier),
+        eq(users.rollNumber, identifier)
+      ),
+      columns: { id: true, name: true, balance: true }
+    });
+
+    if (!targetUser) {
+      return json({ success: false, error: 'Student not found. Check ID/Roll Number.' }, { status: 404 });
+    }
+
+    const userId = targetUser.id; // We found the internal UUID
+
+    // 2. Process the financial transaction
     const result = await db.transaction(async (tx) => {
-      // 1. Log the Payment Record
       const [paymentRecord] = await tx.insert(payments).values({
         userId,
         amount: Number(amount).toFixed(2),
@@ -21,13 +37,11 @@ export const POST: RequestHandler = async ({ request }) => {
         status: 'SUCCESS'
       }).returning();
 
-      // 2. Credit the Wallet
       const [updatedUser] = await tx.update(users)
         .set({ balance: sql`${users.balance} + ${amount}` })
         .where(eq(users.id, userId))
         .returning({ newBalance: users.balance });
 
-      // 3. Write to Immutable Ledger
       await tx.insert(walletTransactions).values({
         userId,
         type: 'CREDIT',
@@ -42,7 +56,9 @@ export const POST: RequestHandler = async ({ request }) => {
       return updatedUser.newBalance;
     });
 
-    return json({ success: true, newBalance: result });
+    // Return the student's name as well so the Admin knows they credited the right person
+    return json({ success: true, newBalance: result, studentName: targetUser.name });
+    
   } catch (error) {
     console.error('Top-up failed:', error);
     return json({ success: false, error: 'Top-up processing failed' }, { status: 500 });
