@@ -63,7 +63,7 @@
     }
 </script>
 
-<div class="relative mx-auto flex h-[var(--app-height)] max-w-md flex-col overflow-hidden bg-background pt-12 font-sans border-x border-neutral-400/25">
+<div class="relative mx-auto flex h-(--app-height) max-w-md flex-col overflow-hidden bg-background pt-12 font-sans border-x border-neutral-400/25">
     <div class="flex flex-1 flex-col px-6">
         <div class="mb-12">
             <h1 class="mb-2 text-3xl leading-none font-bold tracking-tight text-foreground">

@@ -20,7 +20,7 @@
     <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<div class="relative mx-auto flex h-[var(--app-height)] max-w-md flex-col overflow-hidden bg-background font-sans">
+<div class="relative mx-auto flex h-(--app-height) max-w-md flex-col overflow-hidden bg-background font-sans">
     
     <div class="absolute top-0 right-0 left-0 z-50 h-px bg-border"></div>
 
