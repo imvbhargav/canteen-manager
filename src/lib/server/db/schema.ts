@@ -21,6 +21,7 @@ export const paymentStatusEnum = pgEnum('payment_status', ['INITIATED', 'PROCESS
 export const paymentProviderEnum = pgEnum('payment_provider', ['CASH', 'RAZORPAY', 'STRIPE', 'UPI']);
 export const counterStatusEnum = pgEnum('counter_status', ['ACTIVE', 'PRINTER_ISSUE', 'OFFLINE']);
 export const ticketPrintStatusEnum = pgEnum('ticket_print_status', ['PENDING', 'PRINTED', 'FAILED']);
+export const printerTypeEnum = pgEnum('printer_type', ['LAN', 'BT', 'USB', 'NONE']);
 
 export const users = pgTable(
   'users',
@@ -84,6 +85,12 @@ export const counters = pgTable(
     counterNumber: integer('counter_number').notNull().unique(),
     displayName: text('display_name').notNull(),
     status: counterStatusEnum('status').default('ACTIVE').notNull(),
+    
+    printerType: printerTypeEnum('printer_type').default('NONE').notNull(),
+    printerAddress: text('printer_address'), 
+    deviceIdentifier: text('device_identifier'), 
+    isActive: boolean('is_active').default(true).notNull(),
+    
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   }
