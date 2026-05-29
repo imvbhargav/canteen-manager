@@ -159,25 +159,38 @@
 	}
 
 	function testPrint() {
-		alert('1. Attempting WebSocket connection...');
-
-		// Swapped 127.0.0.1 for localhost
 		const ws = new WebSocket('ws://localhost:40213/');
 
 		ws.onopen = () => {
-			alert('2. Connection OPEN! Sending plain text receipt...');
+			// RawBT requires this exact JSON schema over WebSockets
+			const rawbtJob = {
+				attributes: {
+					name: 'Test Order'
+				},
+				elements: [
+					{
+						type: 'text',
+						text: 'BPS CANTEEN\n'
+					},
+					{
+						type: 'text',
+						text: 'WEBSOCKET SUCCESS!\n\n\n\n'
+					}
+				]
+			};
 
-			// Sending raw plain text to bypass any strict JSON parsing errors
-			ws.send('BPS CANTEEN\n--- TEST RECEIPT ---\nRs 100.00\n\n\n');
+			// Stringify the JSON object and send it
+			ws.send(JSON.stringify(rawbtJob));
 
+			// Give RawBT 1 second to parse the JSON before closing the socket
 			setTimeout(() => {
-				alert('3. Data sent. Closing connection.');
+				alert('JSON Sent to RawBT!');
 				ws.close();
-			}, 500);
+			}, 1000);
 		};
 
 		ws.onerror = () => {
-			alert('ERROR: WebSocket Connection Blocked by Chrome or RawBT is sleeping.');
+			alert('ERROR: Connection failed.');
 		};
 	}
 </script>
