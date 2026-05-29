@@ -159,26 +159,25 @@
 	}
 
 	function testPrint() {
-		const rawbtJob = {
-			elements: [
-				{
-					type: 'text',
-					text: 'HELLO FROM WEBSOCKETS!\n\n\n'
-				}
-			]
-		};
+		alert('1. Attempting WebSocket connection...');
 
-		const ws = new WebSocket('ws://127.0.0.1:40213/');
+		// Swapped 127.0.0.1 for localhost
+		const ws = new WebSocket('ws://localhost:40213/');
 
 		ws.onopen = () => {
-			console.log('WS Opened - Sending payload');
-			ws.send(JSON.stringify(rawbtJob));
+			alert('2. Connection OPEN! Sending plain text receipt...');
 
-			setTimeout(() => ws.close(), 1000);
+			// Sending raw plain text to bypass any strict JSON parsing errors
+			ws.send('BPS CANTEEN\n--- TEST RECEIPT ---\nRs 100.00\n\n\n');
+
+			setTimeout(() => {
+				alert('3. Data sent. Closing connection.');
+				ws.close();
+			}, 500);
 		};
 
 		ws.onerror = () => {
-			alert('WebSocket Connection Failed! Chrome blocked it or RawBT is closed.');
+			alert('ERROR: WebSocket Connection Blocked by Chrome or RawBT is sleeping.');
 		};
 	}
 </script>
