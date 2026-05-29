@@ -1,196 +1,213 @@
 <script lang="ts">
-	import '../layout.css';
-	import favicon from '$lib/assets/favicon.svg';
-	import { page } from '$app/stores';
-	import { Home, UtensilsCrossed, QrCode, User, X, Download } from 'lucide-svelte';
-	import { appState } from '$lib/store.svelte';
-	import { resolve } from '$app/paths';
-	import type { UserWallet, MenuItem } from '$lib/types';
-	import { onMount, type Snippet } from 'svelte';
+    import '../layout.css';
+    import favicon from '$lib/assets/favicon.svg';
+    import { page } from '$app/stores';
+    import { Home, UtensilsCrossed, QrCode, User, X, Download, WifiOff } from 'lucide-svelte';
+    import { appState } from '$lib/store.svelte';
+    import { resolve } from '$app/paths';
+    import type { UserWallet, MenuItem } from '$lib/types';
+    import { onMount, type Snippet } from 'svelte';
 
-	let {
-		data,
-		children
-	}: {
-		data: {
-			wallet: UserWallet | null;
-			menuItems: MenuItem[];
-		};
-		children: Snippet;
-	} = $props();
+    let {
+        data,
+        children
+    }: {
+        data: {
+            wallet: UserWallet | null;
+            menuItems: MenuItem[];
+        };
+        children: Snippet;
+    } = $props();
 
-	onMount(() => {
-    const setHeight = () => {
-        const nav = document.getElementById('bottom-nav');
-        const navHeight = nav ? nav.offsetHeight : 0; 
+    let isOffline = $state(false);
+
+    onMount(() => {
+        // Offline Detection
+        isOffline = !navigator.onLine;
+        const handleOnline = () => (isOffline = false);
+        const handleOffline = () => (isOffline = true);
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        // Height Calculation
+        const setHeight = () => {
+            const nav = document.getElementById('bottom-nav');
+            const navHeight = nav ? nav.offsetHeight : 0; 
+            
+            document.documentElement.style.setProperty('--app-height', `${window.innerHeight - navHeight}px`);
+        }
         
-        document.documentElement.style.setProperty('--app-height', `${window.innerHeight - navHeight}px`);
+        setHeight();
+        window.addEventListener('resize', setHeight);
+
+        return () => {
+            window.removeEventListener('resize', setHeight);
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    });
+
+    $effect(() => {
+        if (data.wallet && !appState.wallet) appState.wallet = data.wallet;
+        if (data.menuItems && appState.menuItems.length === 0) appState.menuItems = data.menuItems;
+    });
+
+    const navItems = [
+        { path: resolve('/'), icon: Home, label: 'Home' },
+        { path: resolve('/menu'), icon: UtensilsCrossed, label: 'Menu' },
+        { path: resolve('/ticket'), icon: QrCode, label: 'Ticket' },
+        { path: resolve('/profile'), icon: User, label: 'Profile' }
+    ];
+
+    let currentPath = $derived($page.url.pathname);
+
+    // --- PWA Installation Logic ---
+    interface BeforeInstallPromptEvent extends Event {
+        readonly platforms: Array<string>;
+        readonly userChoice: Promise<{
+            outcome: 'accepted' | 'dismissed';
+            platform: string;
+        }>;
+        prompt(): Promise<void>;
     }
-    
-    setHeight();
-    window.addEventListener('resize', setHeight);
-    return () => window.removeEventListener('resize', setHeight);
-});
 
-	$effect(() => {
-		if (data.wallet && !appState.wallet) appState.wallet = data.wallet;
-		if (data.menuItems && appState.menuItems.length === 0) appState.menuItems = data.menuItems;
-	});
+    let deferredPrompt: BeforeInstallPromptEvent | null = $state(null);
+    let showInstallBanner = $state(false);
 
-	const navItems = [
-		{ path: resolve('/'), icon: Home, label: 'Home' },
-		{ path: resolve('/menu'), icon: UtensilsCrossed, label: 'Menu' },
-		{ path: resolve('/ticket'), icon: QrCode, label: 'Ticket' },
-		{ path: resolve('/profile'), icon: User, label: 'Profile' }
-	];
+    $effect(() => {
+        const handleBeforeInstallPrompt = (e: Event) => {
+            e.preventDefault();
+            deferredPrompt = e as BeforeInstallPromptEvent;
+            showInstallBanner = true;
+        };
 
-	let currentPath = $derived($page.url.pathname);
+        const handleAppInstalled = () => {
+            showInstallBanner = false;
+            deferredPrompt = null;
+        };
 
-	// --- PWA Installation Logic ---
-	// Define the custom event type for TypeScript
-	interface BeforeInstallPromptEvent extends Event {
-		readonly platforms: Array<string>;
-		readonly userChoice: Promise<{
-			outcome: 'accepted' | 'dismissed';
-			platform: string;
-		}>;
-		prompt(): Promise<void>;
-	}
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        window.addEventListener('appinstalled', handleAppInstalled);
 
-	let deferredPrompt: BeforeInstallPromptEvent | null = $state(null);
-	let showInstallBanner = $state(false);
+        return () => {
+            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+            window.removeEventListener('appinstalled', handleAppInstalled);
+        };
+    });
 
-	$effect(() => {
-		const handleBeforeInstallPrompt = (e: Event) => {
-			// Prevent the mini-infobar from appearing on mobile
-			e.preventDefault();
-			// Stash the event so it can be triggered later.
-			deferredPrompt = e as BeforeInstallPromptEvent;
-			// Update UI notify the user they can install the PWA
-			showInstallBanner = true;
-		};
-
-		const handleAppInstalled = () => {
-			// Hide the banner if the user installs it successfully
-			showInstallBanner = false;
-			deferredPrompt = null;
-		};
-
-		window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-		window.addEventListener('appinstalled', handleAppInstalled);
-
-		return () => {
-			window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-			window.removeEventListener('appinstalled', handleAppInstalled);
-		};
-	});
-
-	async function installApp() {
-		if (!deferredPrompt) return;
-
-		// Show the install prompt
-		deferredPrompt.prompt();
-
-		// Wait for the user to respond to the prompt
-		const { outcome } = await deferredPrompt.userChoice;
-		if (outcome === 'accepted') {
-			showInstallBanner = false;
-		}
-
-		// We've used the prompt, and can't use it again, throw it away
-		deferredPrompt = null;
-	}
-	// ------------------------------
+    async function installApp() {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            showInstallBanner = false;
+        }
+        deferredPrompt = null;
+    }
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
-	<meta
-		name="description"
-		content="Manage your campus digital wallet and order food live from BPS Canteen."
-	/>
-	<meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href={favicon} />
+    <meta
+        name="description"
+        content="Manage your campus digital wallet and order food live from BPS Canteen."
+    />
+    <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
+{#if isOffline}
+    <div class="fixed inset-0 z-9999 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm">
+        <div class="flex max-w-sm flex-col items-center space-y-4 p-6 text-center">
+            <div class="rounded-full bg-destructive/10 p-4 text-destructive">
+                <WifiOff size={48} />
+            </div>
+            <h2 class="text-xl font-bold tracking-tight text-foreground">Connection Lost</h2>
+            <p class="text-sm text-muted-foreground">
+                The canteen system requires an active internet connection to process live wallet transactions and print orders. Please check your Wi-Fi or data.
+            </p>
+        </div>
+    </div>
+{/if}
+
 <div
-	class="relative mx-auto flex h-(--app-height) max-w-md flex-col overflow-hidden font-sans"
+    class="relative mx-auto flex h-(--app-height) max-w-md flex-col overflow-hidden font-sans transition-all duration-300 {isOffline ? 'pointer-events-none blur-sm' : ''}"
 >
-	<main class="relative z-0 flex-1 overflow-y-auto pt-3 border-x border-neutral-400/25">
-		{@render children()}
-	</main>
+    <main class="relative z-0 flex-1 overflow-y-auto pt-3 border-x border-neutral-400/25">
+        {@render children()}
+    </main>
 
-	<!-- Custom PWA Install Banner -->
-	{#if showInstallBanner}
-		<div
-			class="animate-in slide-in-from-bottom-2 fade-in absolute right-4 bottom-2 left-4 z-50 duration-300"
-		>
-			<div
-				class="flex items-center justify-between border border-emerald-500/25 backdrop-blur-md p-3 shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
-			>
-				<div class="flex items-center gap-3">
-					<div class="flex h-8 w-8 items-center justify-center bg-emerald-500/10 text-emerald-400">
-						<Download size={16} />
-					</div>
-					<div>
-						<h3 class="text-sm font-medium text-foreground">Install App</h3>
-						<p class="font-mono text-[9px] tracking-widest text-muted-foreground uppercase">
-							Add to home screen
-						</p>
-					</div>
-				</div>
-				<div class="flex items-center gap-2">
-					<button
-						onclick={() => (showInstallBanner = false)}
-						class="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted"
-					>
-						<X size={16} />
-					</button>
-					<button
-						onclick={installApp}
-						class="h-8 bg-foreground px-4 text-xs font-medium tracking-wide text-background transition-all active:scale-95"
-					>
-						Install
-					</button>
-				</div>
-			</div>
-		</div>
-	{/if}
+    {#if showInstallBanner}
+        <div
+            class="animate-in slide-in-from-bottom-2 fade-in absolute right-4 bottom-2 left-4 z-50 duration-300"
+        >
+            <div
+                class="flex items-center justify-between border border-emerald-500/25 backdrop-blur-md p-3 shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
+            >
+                <div class="flex items-center gap-3">
+                    <div class="flex h-8 w-8 items-center justify-center bg-emerald-500/10 text-emerald-400">
+                        <Download size={16} />
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-foreground">Install App</h3>
+                        <p class="font-mono text-[9px] tracking-widest text-muted-foreground uppercase">
+                            Add to home screen
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button
+                        onclick={() => (showInstallBanner = false)}
+                        class="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted"
+                    >
+                        <X size={16} />
+                    </button>
+                    <button
+                        onclick={installApp}
+                        class="h-8 bg-foreground px-4 text-xs font-medium tracking-wide text-background transition-all active:scale-95"
+                    >
+                        Install
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
 
-	<nav
-		id='bottom-nav'
-		class="fixed left-0 bottom-0 z-40 w-full bg-background"
-	>
-		<div class="mx-auto flex max-w-md border-x border-neutral-400/25 items-center border-t px-2 pt-4 supports-[padding:max(0px)]:pb-[max(1rem,env(safe-area-inset-bottom))] justify-around">
-			{#each navItems as { path, icon: Icon, label } (path)}
-				{#if path !== resolve('/menu') || !appState.activeTicket}
-					<a
-						href={path}
-						class="relative flex w-16 flex-col items-center gap-1.5 transition-colors {currentPath ===
-							path ||
-						(path === '/profile' && currentPath.startsWith('/profile'))
-							? 'text-foreground'
-							: 'text-muted-foreground hover:text-foreground/70'}"
-					>
-						{#if path === resolve('/ticket') && appState.activeTicket}
-							<div class="relative">
-								<Icon size={20} strokeWidth={currentPath === path ? 2 : 1.5} />
-								<span
-									class="absolute -top-0.5 -right-1 h-2 w-2 rounded-full border-2 border-background bg-amber-400"
-								></span>
-							</div>
-						{:else}
-							<Icon
-								size={20}
-								strokeWidth={currentPath === path ||
-								(path === '/profile' && currentPath.startsWith('/profile'))
-									? 2
-									: 1.5}
-							/>
-						{/if}
-						<span class="font-mono text-[9px] tracking-widest uppercase">{label}</span>
-					</a>
-				{/if}
-			{/each}
-		</div>
-	</nav>
+    <nav
+        id='bottom-nav'
+        class="fixed left-0 bottom-0 z-40 w-full bg-background"
+    >
+        <div class="mx-auto flex max-w-md border-x border-neutral-400/25 items-center border-t px-2 pt-4 supports-[padding:max(0px)]:pb-[max(1rem,env(safe-area-inset-bottom))] justify-around">
+            {#each navItems as { path, icon: Icon, label } (path)}
+                {#if path !== resolve('/menu') || !appState.activeTicket}
+                    <a
+                        href={path}
+                        class="relative flex w-16 flex-col items-center gap-1.5 transition-colors {currentPath ===
+                            path ||
+                        (path === '/profile' && currentPath.startsWith('/profile'))
+                            ? 'text-foreground'
+                            : 'text-muted-foreground hover:text-foreground/70'}"
+                    >
+                        {#if path === resolve('/ticket') && appState.activeTicket}
+                            <div class="relative">
+                                <Icon size={20} strokeWidth={currentPath === path ? 2 : 1.5} />
+                                <span
+                                    class="absolute -top-0.5 -right-1 h-2 w-2 rounded-full border-2 border-background bg-amber-400"
+                                ></span>
+                            </div>
+                        {:else}
+                            <Icon
+                                size={20}
+                                strokeWidth={currentPath === path ||
+                                (path === '/profile' && currentPath.startsWith('/profile'))
+                                    ? 2
+                                    : 1.5}
+                            />
+                        {/if}
+                        <span class="font-mono text-[9px] tracking-widest uppercase">{label}</span>
+                    </a>
+                {/if}
+            {/each}
+        </div>
+    </nav>
 </div>
