@@ -7,6 +7,11 @@ import { counters, counterStatusLogs } from '$lib/server/db/schema';
 export const PATCH: RequestHandler = async ({ params, request }) => {
   try {
     const { id } = params;
+
+    if (!id) {
+      return json({ success: false, error: 'Counter ID is required' }, { status: 400 });
+    }
+    
     const body = await request.json();
     
     // Extract updateable fields
@@ -44,7 +49,7 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 
     return json({ success: true, data: updatedCounter[0] });
   } catch (error) {
-    console.error(`Failed to update counter ${params.id}:`, error);
+    console.error(`Failed to update counter ${params?.id}:`, error);
     return json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
 };
