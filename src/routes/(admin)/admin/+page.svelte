@@ -14,6 +14,7 @@
         X,
         Archive,
         ArchiveRestore,
+		QrCode,
     } from 'lucide-svelte';
     import { resolve } from '$app/paths';
     import { goto } from '$app/navigation';
@@ -256,6 +257,14 @@
                 <div class="status-dot"></div>
                 <span class="font-mono text-[10px] tracking-wider text-emerald-400 uppercase">System Online</span>
             </div>
+
+            <a 
+                href={resolve('/admin/counters')}
+                class="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title="Manage Counters & QRs"
+            >
+                <QrCode size={16} />
+            </a>
 
             <button
                 onclick={handleLogout}
