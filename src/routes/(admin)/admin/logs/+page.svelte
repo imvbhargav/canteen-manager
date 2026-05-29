@@ -159,40 +159,53 @@
 	}
 
 	function testPrint() {
-    const ws = new WebSocket('ws://127.0.0.1:40213/');
-    ws.binaryType = "arraybuffer"; 
-    
-    ws.onopen = () => {
-        const encoder = new TextEncoder();
-        
-        // 1. ESC/POS Command: Initialize Printer (ESC @)
-        const initCmd = new Uint8Array([0x1B, 0x40]); 
-        
-        // 2. The receipt text (needs extra newlines at the end to clear the blade)
-        const textBytes = encoder.encode("BPS CANTEEN\n--- WEBSOCKET TEST ---\nRs 100.00\n\n\n\n");
-        
-        // 3. ESC/POS Command: Full Cut (GS V A 0)
-        const cutCmd = new Uint8Array([0x1D, 0x56, 0x41, 0x00]);
-        
-        // Combine them into a single binary payload
-        const payload = new Uint8Array(initCmd.length + textBytes.length + cutCmd.length);
-        payload.set(initCmd, 0);
-        payload.set(textBytes, initCmd.length);
-        payload.set(cutCmd, initCmd.length + textBytes.length);
-        
-        // Send the complete byte array
-        ws.send(payload);
-        
-        setTimeout(() => {
-            alert("Bytes + Cut Command sent!");
-            ws.close();
-        }, 500); 
-    };
+		const ws = new WebSocket('ws://127.0.0.1:40213/');
+		ws.binaryType = 'arraybuffer';
 
-    ws.onerror = () => {
-        alert("ERROR: Connection failed.");
-    };
-}
+		ws.onopen = () => {
+			const encoder = new TextEncoder();
+
+			// ESC/POS bytes
+			const initCmd = new Uint8Array([0x1b, 0x40]);
+			const textBytes = encoder.encode('BPS CANTEEN\n--- WEBSOCKET TEST ---\nRs 100.00\n\n\n\n');
+			const cutCmd = new Uint8Array([0x1d, 0x56, 0x41, 0x00]);
+
+			const escpos = new Uint8Array(initCmd.length + textBytes.length + cutCmd.length);
+			escpos.set(initCmd, 0);
+			escpos.set(textBytes, initCmd.length);
+			escpos.set(cutCmd, initCmd.length + textBytes.length);
+
+			// Convert to Base64
+			let binary = '';
+			escpos.forEach((b) => (binary += String.fromCharCode(b)));
+			const base64data = btoa(binary);
+
+			// RawBT expects a JSON job descriptor
+			const job = {
+				version: 1,
+				printer: {
+					type: 'DEFAULT'
+				},
+				data: [
+					{
+						type: 'base64',
+						data: base64data
+					}
+				]
+			};
+
+			ws.send(JSON.stringify(job));
+
+			setTimeout(() => {
+				alert('Job sent!');
+				ws.close();
+			}, 500);
+		};
+
+		ws.onerror = () => {
+			alert('ERROR: Connection failed.');
+		};
+	}
 </script>
 
 <svelte:head><title>Order Logs | Admin</title></svelte:head>
