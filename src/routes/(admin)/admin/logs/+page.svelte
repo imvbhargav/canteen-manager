@@ -161,32 +161,23 @@
 	function testPrint() {
 		const ws = new WebSocket('ws://localhost:40213/');
 
+		// Tell the WebSocket we are speaking in raw binary
+		ws.binaryType = 'arraybuffer';
+
 		ws.onopen = () => {
-			// RawBT requires this exact JSON schema over WebSockets
-			const rawbtJob = {
-				attributes: {
-					name: 'Test Order'
-				},
-				elements: [
-					{
-						type: 'text',
-						text: 'BPS CANTEEN\n'
-					},
-					{
-						type: 'text',
-						text: 'WEBSOCKET SUCCESS!\n\n\n\n'
-					}
-				]
-			};
+			const receiptText = 'BPS CANTEEN\n--- WEBSOCKET TEST ---\nRs 100.00\n\n\n';
 
-			// Stringify the JSON object and send it
-			ws.send(JSON.stringify(rawbtJob));
+			// Convert the standard string into raw binary bytes
+			const encoder = new TextEncoder();
+			const rawBytes = encoder.encode(receiptText);
 
-			// Give RawBT 1 second to parse the JSON before closing the socket
+			// Send the binary frame to RawBT
+			ws.send(rawBytes);
+
 			setTimeout(() => {
-				alert('JSON Sent to RawBT!');
+				alert('Raw Binary Sent!');
 				ws.close();
-			}, 1000);
+			}, 500);
 		};
 
 		ws.onerror = () => {
