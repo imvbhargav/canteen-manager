@@ -72,35 +72,92 @@
     }
 
     // Sends the raw payload silently over WebSockets
-    function autoPrintViaWebSocket(payload: PusherOrderPayload, counterName: string) {
-        let receiptText = `BPS CANTEEN\n`;
-        receiptText += `Counter ${counterName}\n`;
-        receiptText += `--------------------------------\n`;
-        receiptText += `Order Ref : ${payload.ticketReference}\n`;
-        receiptText += `--------------------------------\n`;
-        
-        payload.items.forEach(item => {
-            receiptText += `${item.quantity}x ${item.name}\n`;
-            receiptText += `   Rs ${item.itemTotal}\n`;
+    // Sends the payload silently over WebSockets using RawBT JSON API
+function autoPrintViaWebSocket(payload: PusherOrderPayload, counterName: string) {
+    
+    // 1. Construct the RawBT JSON Array
+    const rawbtElements = [
+        {
+            type: "text",
+            text: "BPS CANTEEN\n",
+            attributes: { 
+                alignment: "center", 
+                bold: true, 
+                width: 2, 
+                height: 2 
+            }
+        },
+        {
+            type: "text",
+            text: `Counter ${counterName}\n`,
+            attributes: { alignment: "center", bold: true }
+        },
+        {
+            type: "text",
+            text: "--------------------------------\n"
+        },
+        {
+            type: "text",
+            text: `Order Ref : ${payload.ticketReference}\n`,
+            attributes: { bold: true }
+        },
+        {
+            type: "text",
+            text: "--------------------------------\n"
+        }
+    ];
+
+    // 2. Loop through your cart items and format them
+    payload.items.forEach(item => {
+        rawbtElements.push({
+            type: "text",
+            text: `${item.quantity}x ${item.name}\n`
         });
-        
-        receiptText += `--------------------------------\n`;
-        receiptText += `Total     : Rs ${payload.netTotal}\n`;
-        receiptText += `--------------------------------\n\n\n`; // Extra newlines to feed paper
+        rawbtElements.push({
+            type: "text",
+            text: `   Rs ${item.itemTotal}\n`,
+            attributes: { bold: true } // Make prices pop
+        });
+    });
 
-        const ws = new WebSocket('ws://127.0.0.1:40213/');
-        
-        ws.onopen = () => {
-            ws.send(receiptText);
-            printerStatus = 'ready';
-            ws.close(); // Close immediately after sending to save tablet battery
-        };
+    // 3. Add the footer and total
+    rawbtElements.push({
+        type: "text",
+        text: "--------------------------------\n"
+    });
+    rawbtElements.push({
+        type: "text",
+        text: `TOTAL: Rs ${payload.netTotal}\n`,
+        attributes: { alignment: "right", bold: true, width: 2, height: 2 }
+    });
+    rawbtElements.push({
+        type: "text",
+        text: "--------------------------------\n\n\n" // Feed paper
+    });
 
-        ws.onerror = () => {
-            console.error("RawBT WebSocket failed. Is the app running?");
-            printerStatus = 'error';
-        };
-    }
+    // 4. Wrap it in the root JSON object expected by RawBT
+    const rawbtJob = {
+        attributes: {
+            // You can add global job attributes here if needed
+        },
+        elements: rawbtElements
+    };
+
+    // 5. Connect and fire the JSON string
+    const ws = new WebSocket('ws://127.0.0.1:40213/');
+    
+    ws.onopen = () => {
+        // Stringify the JSON object and send it
+        ws.send(JSON.stringify(rawbtJob));
+        printerStatus = 'ready';
+        ws.close(); 
+    };
+
+    ws.onerror = () => {
+        console.error("RawBT WebSocket failed. Is the app running?");
+        printerStatus = 'error';
+    };
+}
 
     // Manual test function
     function testPrint() {
