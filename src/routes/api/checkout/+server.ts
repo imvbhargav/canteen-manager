@@ -154,7 +154,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             itemTotal: item.itemTotal
         }));
 
-        await pusher.trigger(`counter-${counterId}`, 'NEW_ORDER', {
+        // Send to BOTH the specific counter (for the desktop app) AND the admin dashboard
+        await pusher.trigger([`counter-${counterId}`, 'admin-orders'], 'NEW_ORDER', {
             orderId: result.id,
             ticketReference: result.ticketReference,
             netTotal: serverTotal.toFixed(2),

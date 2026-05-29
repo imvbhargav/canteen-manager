@@ -17,6 +17,9 @@ importers:
       pusher:
         specifier: ^5.3.3
         version: 5.3.3
+      pusher-js:
+        specifier: ^8.5.0
+        version: 8.5.0
       qr-image:
         specifier: ^3.2.0
         version: 3.2.0
@@ -2106,6 +2109,9 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
+  pusher-js@8.5.0:
+    resolution: {integrity: sha512-V7uzGi9bqOOOyM/6IkJdpFyjGZj7llz1v0oWnYkZKcYLvbz6VcHVLmzKqkvegjuMumpfIEKGLmWHwFb39XFCpw==}
+
   pusher@5.3.3:
     resolution: {integrity: sha512-wxXNGeAPT6vcwCBMGDFfJp6YXtUD0WRurb4fJgU/nbA0rNfcOcSZmba9j4zM8ywmORst1fXpHRUsgB1r/ssTmw==}
     engines: {node: '>= 4.0.0'}
@@ -4000,6 +4006,10 @@ snapshots:
   prettier@3.8.3: {}
 
   punycode@2.3.1: {}
+
+  pusher-js@8.5.0:
+    dependencies:
+      tweetnacl: 1.0.3
 
   pusher@5.3.3:
     dependencies:

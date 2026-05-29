@@ -14,7 +14,8 @@
         X,
         Archive,
         ArchiveRestore,
-        QrCode // Added QrCode icon
+        QrCode,
+        ClipboardList
     } from 'lucide-svelte';
     import { resolve } from '$app/paths';
     import { goto } from '$app/navigation';
@@ -258,18 +259,27 @@
                 <span class="font-mono text-[10px] tracking-wider text-emerald-400 uppercase">System Online</span>
             </div>
             
-            <a 
-                href={resolve('/admin/counters')}
-                class="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="Manage Counters & QRs"
-            >
-                <QrCode size={16} />
-            </a>
+            <div class="flex items-center gap-1 border-r border-border pr-2">
+                <a 
+                    href={resolve('/admin/counters')}
+                    class="flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    title="Manage Counters & QRs"
+                >
+                    <QrCode size={16} />
+                </a>
+                <a 
+                    href={resolve('/admin/logs')}
+                    class="flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    title="Order Logs"
+                >
+                    <ClipboardList size={16} />
+                </a>
+            </div>
 
             <button
                 onclick={handleLogout}
                 disabled={isLoggingOut}
-                class="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                class="flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                 title="Log Out"
             >
                 {#if isLoggingOut}
