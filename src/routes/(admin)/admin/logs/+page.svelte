@@ -159,31 +159,40 @@
 	}
 
 	function testPrint() {
-		const ws = new WebSocket('ws://localhost:40213/');
+    const ws = new WebSocket('ws://127.0.0.1:40213/');
+    ws.binaryType = "arraybuffer"; 
+    
+    ws.onopen = () => {
+        const encoder = new TextEncoder();
+        
+        // 1. ESC/POS Command: Initialize Printer (ESC @)
+        const initCmd = new Uint8Array([0x1B, 0x40]); 
+        
+        // 2. The receipt text (needs extra newlines at the end to clear the blade)
+        const textBytes = encoder.encode("BPS CANTEEN\n--- WEBSOCKET TEST ---\nRs 100.00\n\n\n\n");
+        
+        // 3. ESC/POS Command: Full Cut (GS V A 0)
+        const cutCmd = new Uint8Array([0x1D, 0x56, 0x41, 0x00]);
+        
+        // Combine them into a single binary payload
+        const payload = new Uint8Array(initCmd.length + textBytes.length + cutCmd.length);
+        payload.set(initCmd, 0);
+        payload.set(textBytes, initCmd.length);
+        payload.set(cutCmd, initCmd.length + textBytes.length);
+        
+        // Send the complete byte array
+        ws.send(payload);
+        
+        setTimeout(() => {
+            alert("Bytes + Cut Command sent!");
+            ws.close();
+        }, 500); 
+    };
 
-		// Tell the WebSocket we are speaking in raw binary
-		ws.binaryType = 'arraybuffer';
-
-		ws.onopen = () => {
-			const receiptText = 'BPS CANTEEN\n--- WEBSOCKET TEST ---\nRs 100.00\n\n\n';
-
-			// Convert the standard string into raw binary bytes
-			const encoder = new TextEncoder();
-			const rawBytes = encoder.encode(receiptText);
-
-			// Send the binary frame to RawBT
-			ws.send(rawBytes);
-
-			setTimeout(() => {
-				alert('Raw Binary Sent!');
-				ws.close();
-			}, 500);
-		};
-
-		ws.onerror = () => {
-			alert('ERROR: Connection failed.');
-		};
-	}
+    ws.onerror = () => {
+        alert("ERROR: Connection failed.");
+    };
+}
 </script>
 
 <svelte:head><title>Order Logs | Admin</title></svelte:head>
