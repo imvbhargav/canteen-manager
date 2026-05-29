@@ -122,10 +122,10 @@
 	<!-- Custom PWA Install Banner -->
 	{#if showInstallBanner}
 		<div
-			class="animate-in slide-in-from-bottom-2 fade-in absolute right-4 bottom-22.5 left-4 z-50 duration-300"
+			class="animate-in slide-in-from-bottom-2 fade-in absolute right-4 bottom-2 left-4 z-50 duration-300"
 		>
 			<div
-				class="flex items-center justify-between border border-emerald-500/30 bg-card p-3 shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
+				class="flex items-center justify-between border border-emerald-500/25 backdrop-blur-md p-3 shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
 			>
 				<div class="flex items-center gap-3">
 					<div class="flex h-8 w-8 items-center justify-center bg-emerald-500/10 text-emerald-400">

@@ -18,10 +18,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       return json({ success: false, error: 'Missing credentials' }, { status: 400 });
     }
 
+    const normalizedIdentifier = identifier.toUpperCase()
     const user = await db.query.users.findFirst({
       where: or(
-        eq(users.studentId, identifier),
-        eq(users.rollNumber, identifier)
+        eq(users.studentId, normalizedIdentifier),
+        eq(users.rollNumber, normalizedIdentifier)
       ),
       columns: {
         id: true,

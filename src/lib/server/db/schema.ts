@@ -11,20 +11,17 @@ import {
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
-// ENUMS
 export const userRoleEnum = pgEnum('user_role', ['STUDENT', 'STAFF', 'ADMIN']);
-
 export const categoryEnum = pgEnum('menu_category', ['Breakfast', 'Lunch', 'Snacks', 'Beverages']);
 export const dietaryEnum = pgEnum('dietary_type', ['veg', 'non-veg']);
 export const ticketStatusEnum = pgEnum('ticket_status', ['PENDING', 'READY', 'COMPLETED', 'CANCELLED']);
-
 export const transactionTypeEnum = pgEnum('transaction_type', ['CREDIT', 'DEBIT']);
 export const transactionRefEnum = pgEnum('transaction_reference_type', ['TOP_UP', 'TICKET_PURCHASE', 'REFUND', 'ADJUSTMENT']);
-
 export const paymentStatusEnum = pgEnum('payment_status', ['INITIATED', 'PROCESSING', 'SUCCESS', 'FAILED', 'REFUNDED']);
 export const paymentProviderEnum = pgEnum('payment_provider', ['CASH', 'RAZORPAY', 'STRIPE', 'UPI']);
+export const counterStatusEnum = pgEnum('counter_status', ['ACTIVE', 'PRINTER_ISSUE', 'OFFLINE']);
+export const ticketPrintStatusEnum = pgEnum('ticket_print_status', ['PENDING', 'PRINTED', 'FAILED']);
 
-// CORE ENTITIES
 export const users = pgTable(
   'users',
   {
@@ -53,7 +50,7 @@ export const userSessions = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-    deviceIdentifier: text('device_identifier').notNull(), // e.g., "iPhone 13 Pro - Safari"
+    deviceIdentifier: text('device_identifier').notNull(),
     tokenHash: text('token_hash').notNull().unique(),
     isRevoked: boolean('is_revoked').default(false).notNull(),
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }).defaultNow().notNull(),
@@ -71,7 +68,7 @@ export const menuItems = pgTable(
     category: categoryEnum('category').notNull(),
     inStock: boolean('in_stock').default(true).notNull(),
     dietary: dietaryEnum('dietary').notNull(),
-    isArchived: boolean('is_archived').default(false).notNull(), // Soft delete for enterprise
+    isArchived: boolean('is_archived').default(false).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -80,15 +77,42 @@ export const menuItems = pgTable(
   ])
 );
 
-// ORDERS & TICKETS
+export const counters = pgTable(
+  'counters',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    counterNumber: integer('counter_number').notNull().unique(),
+    displayName: text('display_name').notNull(),
+    status: counterStatusEnum('status').default('ACTIVE').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  }
+);
+
+export const counterStatusLogs = pgTable(
+  'counter_status_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    counterId: uuid('counter_id').notNull().references(() => counters.id, { onDelete: 'cascade' }),
+    previousStatus: counterStatusEnum('previous_status'),
+    newStatus: counterStatusEnum('new_status').notNull(),
+    reason: text('reason'),
+    changedAt: timestamp('changed_at', { withTimezone: true }).defaultNow().notNull(),
+  }
+);
+
 export const tickets = pgTable(
   'tickets',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    ticketReference: text('ticket_reference').notNull().unique(), // NEX-54213
+    ticketReference: text('ticket_reference').notNull().unique(),
     userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    counterId: uuid('counter_id').notNull().references(() => counters.id, { onDelete: 'restrict' }),
     totalAmount: numeric('total_amount', { precision: 10, scale: 2 }).notNull(),
     status: ticketStatusEnum('status').default('PENDING').notNull(),
+    printStatus: ticketPrintStatusEnum('print_status').default('PENDING').notNull(),
+    printErrorReason: text('print_error_reason'), // e.g., "PAPER_OUT", "USB_DISCONNECTED"
+    printedAt: timestamp('printed_at', { withTimezone: true }), 
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -104,7 +128,7 @@ export const ticketItems = pgTable(
     ticketId: uuid('ticket_id').notNull().references(() => tickets.id, { onDelete: 'cascade' }),
     menuItemId: uuid('menu_item_id').notNull().references(() => menuItems.id, { onDelete: 'restrict' }),
     quantity: integer('quantity').notNull(),
-    unitPrice: numeric('unit_price', { precision: 10, scale: 2 }).notNull(), // Historical snapshot
+    unitPrice: numeric('unit_price', { precision: 10, scale: 2 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ([
@@ -113,7 +137,6 @@ export const ticketItems = pgTable(
   ])
 );
 
-// FINANCIALS: PAYMENTS & WALLET LEDGER
 export const payments = pgTable(
   'payments',
   {
@@ -121,7 +144,7 @@ export const payments = pgTable(
     userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
     amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),
     provider: paymentProviderEnum('provider').notNull(),
-    providerTxnId: text('provider_txn_id'), // External ID (Razorpay payment_id) or Receipt No. for CASH
+    providerTxnId: text('provider_txn_id'),
     status: paymentStatusEnum('status').default('INITIATED').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -136,31 +159,21 @@ export const walletTransactions = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
-    type: transactionTypeEnum('type').notNull(), // CREDIT (+), DEBIT (-)
+    type: transactionTypeEnum('type').notNull(),
     amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),
-    
-    // Audit Trail: What was the balance immediately after this transaction?
     balanceAfter: numeric('balance_after', { precision: 10, scale: 2 }).notNull(),
-    
-    // Context linking
     referenceType: transactionRefEnum('reference_type').notNull(),
-    ticketId: uuid('ticket_id').references(() => tickets.id, { onDelete: 'restrict' }), // Populated if TICKET_PURCHASE or REFUND
-    paymentId: uuid('payment_id').references(() => payments.id, { onDelete: 'restrict' }), // Populated if TOP_UP
-    
-    description: text('description').notNull(), // e.g., "Lunch Checkout", "Wallet Top-up"
-    
-    // Enterprise Idempotency: Prevents double-charging if a network request is retried
-    idempotencyKey: text('idempotency_key').notNull().unique(), 
-    
+    ticketId: uuid('ticket_id').references(() => tickets.id, { onDelete: 'restrict' }),
+    paymentId: uuid('payment_id').references(() => payments.id, { onDelete: 'restrict' }),
+    description: text('description').notNull(),
+    idempotencyKey: text('idempotency_key').notNull().unique(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ([
     check('wallet_txn_amount_check', sql`${table.amount} > 0`),
-    // Partial indexes ensure lookups for idempotent requests are lightning-fast
   ])
 );
 
-// DRIZZLE RELATIONS
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(userSessions),
   tickets: many(tickets),
@@ -176,10 +189,20 @@ export const menuItemsRelations = relations(menuItems, ({ many }) => ({
   ticketItems: many(ticketItems),
 }));
 
+export const countersRelations = relations(counters, ({ many }) => ({
+  tickets: many(tickets),
+  statusLogs: many(counterStatusLogs),
+}));
+
+export const counterStatusLogsRelations = relations(counterStatusLogs, ({ one }) => ({
+  counter: one(counters, { fields: [counterStatusLogs.counterId], references: [counters.id] }),
+}));
+
 export const ticketsRelations = relations(tickets, ({ one, many }) => ({
   user: one(users, { fields: [tickets.userId], references: [users.id] }),
+  counter: one(counters, { fields: [tickets.counterId], references: [counters.id] }),
   items: many(ticketItems),
-  walletTransactions: many(walletTransactions), // Easily find the ledger entry for a ticket
+  walletTransactions: many(walletTransactions),
 }));
 
 export const ticketItemsRelations = relations(ticketItems, ({ one }) => ({
@@ -189,7 +212,7 @@ export const ticketItemsRelations = relations(ticketItems, ({ one }) => ({
 
 export const paymentsRelations = relations(payments, ({ one, many }) => ({
   user: one(users, { fields: [payments.userId], references: [users.id] }),
-  walletTransactions: many(walletTransactions), // Connects successful payments to the wallet credit
+  walletTransactions: many(walletTransactions),
 }));
 
 export const walletTransactionsRelations = relations(walletTransactions, ({ one }) => ({

@@ -14,8 +14,7 @@
         X,
         Archive,
         ArchiveRestore,
-        Package,
-        PackageX
+        QrCode // Added QrCode icon
     } from 'lucide-svelte';
     import { resolve } from '$app/paths';
     import { goto } from '$app/navigation';
@@ -253,12 +252,20 @@
                 Admin Console
             </h2>
         </div>
-        <div class="flex items-center gap-3">
-            <div class="flex items-center gap-1.5 border-r border-border pr-3">
+        <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 border-r border-border pr-2">
                 <div class="status-dot"></div>
                 <span class="font-mono text-[10px] tracking-wider text-emerald-400 uppercase">System Online</span>
             </div>
             
+            <a 
+                href={resolve('/admin/counters')}
+                class="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title="Manage Counters & QRs"
+            >
+                <QrCode size={16} />
+            </a>
+
             <button
                 onclick={handleLogout}
                 disabled={isLoggingOut}
@@ -472,17 +479,6 @@
                                             <p class="mt-1.5 font-mono text-sm text-foreground">₹{item.price}</p>
                                         </div>
                                         <div class="flex shrink-0 items-center gap-1">
-                                            <button 
-                                                onclick={() => handleStatusToggle(item.id, { inStock: !item.inStock })} 
-                                                class="p-2 transition-colors {!item.inStock && !item.isArchived ? 'text-destructive' : 'text-muted-foreground hover:text-foreground'}" 
-                                                title={item.inStock ? 'Mark Out of Stock' : 'Mark In Stock'}
-                                            >
-                                                {#if item.inStock}
-                                                    <PackageX size={16} />
-                                                {:else}
-                                                    <Package size={16} />
-                                                {/if}
-                                            </button>
                                             <button 
                                                 onclick={() => handleStatusToggle(item.id, { isArchived: !item.isArchived })} 
                                                 class="p-2 transition-colors {item.isArchived ? 'text-amber-500' : 'text-muted-foreground hover:text-foreground'}" 

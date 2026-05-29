@@ -3,7 +3,7 @@
     import { goto } from '$app/navigation';
     import { ArrowLeft, QrCode, ScanLine, CheckCircle, X, Hash, ShoppingBag, Loader2 } from 'lucide-svelte';
     import jsQR from 'jsqr';
-	import { resolve } from '$app/paths';
+    import { resolve } from '$app/paths';
 
     type ScanState = 'idle' | 'starting' | 'scanning' | 'success' | 'error';
     type FallbackState = 'hidden' | 'open' | 'submitting' | 'confirmed';
@@ -43,7 +43,7 @@
             }, 50);
 
         } catch (err: unknown) {
-            console.error("Camera access denied or failed:", err);
+            console.error(err);
             scanState = 'error';
             manualError = 'Camera access denied. Please use manual entry.';
         }
@@ -55,18 +55,27 @@
         if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
             canvasEl.height = videoEl.videoHeight;
             canvasEl.width = videoEl.videoWidth;
-            const ctx = canvasEl.getContext('2d', { willReadFrequently: true });
+            const ctx: CanvasRenderingContext2D | null = canvasEl.getContext('2d', { willReadFrequently: true });
             
             if (ctx) {
                 ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-                const imageData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
+                const imageData: ImageData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
                 
                 const code = jsQR(imageData.data, imageData.width, imageData.height, {
                     inversionAttempts: 'dontInvert'
                 });
 
                 if (code) {
-                    handleSuccessfulScan();
+                    const rawData: string = code.data.trim();
+
+                    // If it contains a colon, we assume it's our encrypted "ivHex:encryptedHex" format
+                    if (rawData.includes(':') && rawData.length > 30) {
+                        handleSuccessfulScan(rawData);
+                    } else {
+                        stopCamera();
+                        scanState = 'error';
+                        manualError = 'Invalid QR code. Please scan a valid counter QR.';
+                    }
                     return;
                 }
             }
@@ -74,13 +83,13 @@
         animationFrameId = requestAnimationFrame(scanLoop);
     }
 
-    async function handleSuccessfulScan() {
+    async function handleSuccessfulScan(securePayload: string): Promise<void> {
         stopCamera();
         scanState = 'success';
-        await handleCollected();
+        await handleCollected(securePayload);
     }
 
-    function stopCamera() {
+    function stopCamera(): void {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
@@ -117,27 +126,41 @@
         fallbackState = 'submitting';
         setTimeout(async () => {
             fallbackState = 'confirmed';
-            await handleCollected();
+            await handleCollected('MANUAL_FALLBACK'); 
         }, 1500);
     }
 
-    async function handleCollected() {
+    async function handleCollected(securePayload: string): Promise<void> {
         if (appState.activeTicket && appState.wallet) {
             try {
                 const payload = appState.activeTicket.items.map(i => ({ id: i.menuItem.id, quantity: i.quantity }));
-                const response = await fetch('/api/checkout', {
+                
+                const response: Response = await fetch('/api/checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cart: payload })
+                    body: JSON.stringify({ 
+                        cart: payload,
+                        securePayload: securePayload 
+                    })
                 });
+                
                 const result = await response.json();
+                
                 if (result.success) {
                     appState.wallet.balance -= appState.activeTicket.total;
                     appState.activeTicket = { ...appState.activeTicket, status: 'COMPLETED' };
                     appState.activeTicket = null;
                     goto(resolve('/'));
+                } else {
+                    scanState = 'error';
+                    manualError = result.error || 'Checkout failed. Please try again.';
+                    fallbackState = 'hidden';
                 }
-            } catch (err) { console.error(err); }
+            } catch (err: unknown) {
+                console.error(err);
+                scanState = 'error';
+                manualError = 'Network error. Could not connect to the server.';
+            }
         }
     }
 </script>

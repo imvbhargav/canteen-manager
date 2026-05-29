@@ -1,7 +1,7 @@
 <script lang="ts">
     import { resolve } from '$app/paths';
     import { appState } from '$lib/store.svelte';
-    import { Bell, Shield, LogOut, ChevronRight, History, CreditCard, Wallet, ArrowLeft, Download } from 'lucide-svelte';
+    import { Bell, Shield, LogOut, ChevronRight, History, CreditCard, Wallet, ArrowLeft, Download, CheckCircle } from 'lucide-svelte'; // Added CheckCircle
 
     // --- PWA Installation State ---
     interface BeforeInstallPromptEvent extends Event {
@@ -14,10 +14,9 @@
     }
 
     let deferredPrompt: BeforeInstallPromptEvent | null = $state(null);
-    let isInstalled = $state(true); // Default to true to prevent a flicker before the effect runs
+    let isInstalled = $state(true); 
 
     $effect(() => {
-        // Check if the app is already running in installed (standalone) mode
         isInstalled = 
             window.matchMedia('(display-mode: standalone)').matches || 
             !!(window.navigator as Navigator & { standalone?: boolean }).standalone;
@@ -25,7 +24,7 @@
         const handleBeforeInstallPrompt = (e: Event) => {
             e.preventDefault();
             deferredPrompt = e as BeforeInstallPromptEvent;
-            isInstalled = false; // We got the prompt, so it's definitely not installed
+            isInstalled = false; 
         };
 
         const handleAppInstalled = () => {
@@ -43,14 +42,18 @@
     });
 
     async function installApp() {
-        if (!deferredPrompt) return;
-        
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        
-        if (outcome === 'accepted') {
-            isInstalled = true;
-            deferredPrompt = null;
+        if (deferredPrompt) {
+            // Trigger the native browser prompt
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            
+            if (outcome === 'accepted') {
+                isInstalled = true;
+                deferredPrompt = null;
+            }
+        } else {
+            // Fallback for iOS Safari or browsers where the prompt isn't supported/available
+            alert("To install this app, tap your browser's Share or Menu button, then select 'Add to Home Screen'.");
         }
     }
     // ------------------------------
@@ -119,7 +122,15 @@
                         <ChevronRight size={14} class="text-muted-foreground" />
                     </a>
                     
-                    {#if deferredPrompt && !isInstalled}
+                    {#if isInstalled}
+                        <div class="w-full flex items-center justify-between px-5 py-4 bg-muted/20">
+                            <div class="flex items-center gap-3">
+                                <CheckCircle size={15} class="text-emerald-500" />
+                                <span class="text-sm text-foreground">App Installed</span>
+                            </div>
+                            <span class="font-mono text-[10px] text-emerald-500 uppercase tracking-widest">Active</span>
+                        </div>
+                    {:else}
                         <button onclick={installApp} class="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors active:scale-[0.99]">
                             <div class="flex items-center gap-3">
                                 <Download size={15} class="text-muted-foreground" />

@@ -1,74 +1,137 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { users, tickets, ticketItems, walletTransactions, menuItems } from '$lib/server/db/schema';
+import { users, tickets, ticketItems, walletTransactions, menuItems, counters } from '$lib/server/db/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto'; // FIX 1: Import randomUUID directly
+import { randomUUID } from 'node:crypto';
+import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
+import { decryptCounterData } from '$lib/crypto';
+import Pusher from 'pusher';
+
+const pusher: Pusher = new Pusher({
+  appId: env.PUSHER_APP_ID as string,
+  key: env.PUSHER_KEY as string,
+  secret: env.PUSHER_SECRET as string,
+  cluster: env.PUSHER_CLUSTER as string,
+  useTLS: true
+});
+
+interface CartItem {
+  id: string;
+  quantity: number;
+}
+
+interface ValidatedItem {
+  menuItemId: string;
+  name: string;
+  quantity: number;
+  unitPrice: string;
+  itemTotal: string;
+}
+
+interface ReceiptItem {
+  name: string;
+  quantity: number;
+  unitPrice: string;
+  itemTotal: string;
+}
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-    if (!locals.user) {
+  if (!locals.user) {
     return json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
-  
-  const userId = locals.user.id; 
-  
-  const { cart } = await request.json() as { cart: { id: string; quantity: number }[] };
+
+  const userId: string = locals.user.id;
+
+  const { cart, securePayload } = await request.json() as {
+    cart: CartItem[];
+    securePayload: string;
+  };
 
   if (!cart || cart.length === 0) {
     return json({ success: false, error: 'Cart is empty' }, { status: 400 });
   }
 
+  if (!securePayload) {
+    return json({ success: false, error: 'Missing QR scan data' }, { status: 400 });
+  }
+
   try {
-    // 1. Fetch real prices from DB (Never trust client prices)
-    const itemIds = cart.map(item => item.id);
+    let counterId: string = securePayload;
+    
+    if (securePayload !== 'MANUAL_FALLBACK') {
+        const decrypted: string | null = decryptCounterData(securePayload);
+        if (!decrypted) {
+            return json({ success: false, error: 'Invalid or tampered QR code' }, { status: 400 });
+        }
+        counterId = decrypted;
+    }
+
+    if (counterId !== 'MANUAL_FALLBACK') {
+        const counter = await db.query.counters.findFirst({
+            where: eq(counters.id, counterId)
+        });
+
+        if (!counter || counter.status !== 'ACTIVE') {
+            return json({ success: false, error: 'This counter is temporarily out of service' }, { status: 400 });
+        }
+    }
+
+    const itemIds: string[] = cart.map((item: CartItem) => item.id);
     const dbItems = await db.query.menuItems.findMany({
       where: inArray(menuItems.id, itemIds)
     });
 
-    // 2. Calculate authoritative total
-    let serverTotal = 0;
-    const validatedItems = cart.map(cartItem => {
+    let serverTotal: number = 0;
+    
+    const validatedItems: ValidatedItem[] = cart.map((cartItem: CartItem) => {
       const dbItem = dbItems.find(i => i.id === cartItem.id);
-      if (!dbItem || !dbItem.inStock) throw new Error(`Item ${cartItem.id} unavailable`);
-      
-      const price = Number(dbItem.price);
+      if (!dbItem || !dbItem.inStock) {
+          throw new Error(`Item ${cartItem.id} unavailable`);
+      }
+
+      const price: number = Number(dbItem.price);
       serverTotal += price * cartItem.quantity;
-      
+
       return {
         menuItemId: dbItem.id,
+        name: dbItem.name,
         quantity: cartItem.quantity,
-        unitPrice: price.toFixed(2)
+        unitPrice: price.toFixed(2),
+        itemTotal: (price * cartItem.quantity).toFixed(2)
       };
     });
 
-    // 3. Execute ACID Transaction
     const result = await db.transaction(async (tx) => {
-      // 3a. Verify & Deduct Balance (Will throw if balance goes negative due to DB constraint)
       const [updatedUser] = await tx.update(users)
         .set({ balance: sql`${users.balance} - ${serverTotal}` })
         .where(eq(users.id, userId))
         .returning({ newBalance: users.balance });
 
-      // 3b. Create Ticket
-      const ticketRef = `NEX-${Math.floor(10000 + Math.random() * 90000)}`;
+      const ticketRef: string = `NEX-${Math.floor(10000 + Math.random() * 90000)}`;
+
+      const actualCounterId: string = counterId;
+
       const [newTicket] = await tx.insert(tickets)
         .values({
           userId,
+          counterId: actualCounterId, 
           ticketReference: ticketRef,
           totalAmount: serverTotal.toFixed(2),
-          status: 'PENDING'
+          status: 'PENDING',
+          printStatus: 'PENDING'
         })
         .returning();
 
-      // 3c. Insert Ticket Items
       await tx.insert(ticketItems).values(
-        validatedItems.map(item => ({
+        validatedItems.map((item: ValidatedItem) => ({
           ticketId: newTicket.id,
-          ...item
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice
         }))
       );
 
-      // 3d. Record Immutable Ledger Entry
       await tx.insert(walletTransactions).values({
         userId,
         type: 'DEBIT',
@@ -77,24 +140,36 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         referenceType: 'TICKET_PURCHASE',
         ticketId: newTicket.id,
         description: 'Canteen Checkout',
-        idempotencyKey: randomUUID(), // FIX 1: Use the directly imported function
+        idempotencyKey: randomUUID(),
       });
 
       return newTicket;
     });
 
-    return json({ success: true, data: result });
-  } catch (error: unknown) { // FIX 2: Change 'any' to 'unknown'
-    console.error('Checkout failed:', error);
-    
-    // Safely extract the error message
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    if (counterId !== 'MANUAL_FALLBACK') {
+        const receiptItems: ReceiptItem[] = validatedItems.map((item: ValidatedItem) => ({
+            name: item.name,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            itemTotal: item.itemTotal
+        }));
 
-    // Handle DB constraint violation (Insufficient funds)
+        await pusher.trigger(`counter-${counterId}`, 'NEW_ORDER', {
+            orderId: result.id,
+            ticketReference: result.ticketReference,
+            netTotal: serverTotal.toFixed(2),
+            items: receiptItems
+        });
+    }
+
+    return json({ success: true, data: result });
+  } catch (error: unknown) {
+    const errorMessage: string = error instanceof Error ? error.message : 'Unknown error occurred';
+
     if (errorMessage.includes('users_balance_check')) {
       return json({ success: false, error: 'Insufficient funds' }, { status: 402 });
     }
-    
+
     return json({ success: false, error: errorMessage || 'Checkout failed' }, { status: 500 });
   }
 };

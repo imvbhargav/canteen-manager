@@ -38,8 +38,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     const result = await db.transaction(async (tx) => {
       const [newUser] = await tx.insert(users).values({
         name,
-        studentId: generatedStudentId,
-        rollNumber,
+        studentId: generatedStudentId.toUpperCase(),
+        rollNumber: rollNumber.toUpperCase(),
         pinHash: hashedPin,
         balance: '0.00', // Initialize with zero balance
         isActive: true
