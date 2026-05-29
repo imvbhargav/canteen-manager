@@ -158,18 +158,28 @@
 		};
 	}
 
-	// Manual test function
 	function testPrint() {
-		const payload: PusherOrderPayload = {
-			orderId: 'test-123',
-			ticketReference: 'TEST-00000',
-			netTotal: '100.00',
-			items: [
-				{ name: 'Coffee', quantity: 2, unitPrice: '20.00', itemTotal: '40.00' },
-				{ name: 'Masala Dosa', quantity: 1, unitPrice: '60.00', itemTotal: '60.00' }
+		const rawbtJob = {
+			elements: [
+				{
+					type: 'text',
+					text: 'HELLO FROM WEBSOCKETS!\n\n\n'
+				}
 			]
 		};
-		autoPrintViaWebSocket(payload, '01');
+
+		const ws = new WebSocket('ws://127.0.0.1:40213/');
+
+		ws.onopen = () => {
+			console.log('WS Opened - Sending payload');
+			ws.send(JSON.stringify(rawbtJob));
+
+			setTimeout(() => ws.close(), 1000);
+		};
+
+		ws.onerror = () => {
+			alert('WebSocket Connection Failed! Chrome blocked it or RawBT is closed.');
+		};
 	}
 </script>
 
