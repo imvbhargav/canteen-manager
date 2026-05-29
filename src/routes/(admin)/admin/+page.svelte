@@ -14,8 +14,6 @@
         X,
         Archive,
         ArchiveRestore,
-        QrCode,
-        ClipboardList
     } from 'lucide-svelte';
     import { resolve } from '$app/paths';
     import { goto } from '$app/navigation';
@@ -257,23 +255,6 @@
             <div class="flex items-center gap-1.5 border-r border-border pr-2">
                 <div class="status-dot"></div>
                 <span class="font-mono text-[10px] tracking-wider text-emerald-400 uppercase">System Online</span>
-            </div>
-            
-            <div class="flex items-center gap-1 border-r border-border pr-2">
-                <a 
-                    href={resolve('/admin/counters')}
-                    class="flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    title="Manage Counters & QRs"
-                >
-                    <QrCode size={16} />
-                </a>
-                <a 
-                    href={resolve('/admin/logs')}
-                    class="flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    title="Order Logs"
-                >
-                    <ClipboardList size={16} />
-                </a>
             </div>
 
             <button
