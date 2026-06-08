@@ -1,6 +1,13 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { users, tickets, ticketItems, walletTransactions, menuItems, counters } from '$lib/server/db/schema';
+import {
+	users,
+	tickets,
+	ticketItems,
+	walletTransactions,
+	menuItems,
+	counters
+} from '$lib/server/db/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { env } from '$env/dynamic/private';
@@ -9,169 +16,174 @@ import { decryptCounterData } from '$lib/crypto';
 import Pusher from 'pusher';
 
 const pusher: Pusher = new Pusher({
-  appId: env.PUSHER_APP_ID as string,
-  key: env.PUSHER_KEY as string,
-  secret: env.PUSHER_SECRET as string,
-  cluster: env.PUSHER_CLUSTER as string,
-  useTLS: true
+	appId: env.PUSHER_APP_ID as string,
+	key: env.PUSHER_KEY as string,
+	secret: env.PUSHER_SECRET as string,
+	cluster: env.PUSHER_CLUSTER as string,
+	useTLS: true
 });
 
 interface CartItem {
-  id: string;
-  quantity: number;
+	id: string;
+	quantity: number;
 }
 
 interface ValidatedItem {
-  menuItemId: string;
-  name: string;
-  quantity: number;
-  unitPrice: string;
-  itemTotal: string;
+	menuItemId: string;
+	name: string;
+	quantity: number;
+	unitPrice: string;
+	itemTotal: string;
 }
 
 interface ReceiptItem {
-  name: string;
-  quantity: number;
-  unitPrice: string;
-  itemTotal: string;
+	name: string;
+	quantity: number;
+	unitPrice: string;
+	itemTotal: string;
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-  if (!locals.user) {
-    return json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
+	if (!locals.user) {
+		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	}
 
-  const userId: string = locals.user.id;
+	const userId: string = locals.user.id;
 
-  const { cart, securePayload } = await request.json() as {
-    cart: CartItem[];
-    securePayload: string;
-  };
+	const { cart, securePayload } = (await request.json()) as {
+		cart: CartItem[];
+		securePayload: string;
+	};
 
-  if (!cart || cart.length === 0) {
-    return json({ success: false, error: 'Cart is empty' }, { status: 400 });
-  }
+	if (!cart || cart.length === 0) {
+		return json({ success: false, error: 'Cart is empty' }, { status: 400 });
+	}
 
-  if (!securePayload) {
-    return json({ success: false, error: 'Missing QR scan data' }, { status: 400 });
-  }
+	if (!securePayload) {
+		return json({ success: false, error: 'Missing QR scan data' }, { status: 400 });
+	}
 
-  try {
-    let counterId: string = securePayload;
-    
-    if (securePayload !== 'MANUAL_FALLBACK') {
-        const decrypted: string | null = decryptCounterData(securePayload);
-        if (!decrypted) {
-            return json({ success: false, error: 'Invalid or tampered QR code' }, { status: 400 });
-        }
-        counterId = decrypted;
-    }
+	try {
+		let counterId: string = securePayload;
 
-    if (counterId !== 'MANUAL_FALLBACK') {
-        const counter = await db.query.counters.findFirst({
-            where: eq(counters.id, counterId)
-        });
+		if (securePayload !== 'MANUAL_FALLBACK') {
+			const decrypted: string | null = decryptCounterData(securePayload);
+			if (!decrypted) {
+				return json({ success: false, error: 'Invalid or tampered QR code' }, { status: 400 });
+			}
+			counterId = decrypted;
+		}
 
-        if (!counter || counter.status !== 'ACTIVE') {
-            return json({ success: false, error: 'This counter is temporarily out of service' }, { status: 400 });
-        }
-    }
+		if (counterId !== 'MANUAL_FALLBACK') {
+			const counter = await db.query.counters.findFirst({
+				where: eq(counters.id, counterId)
+			});
 
-    const itemIds: string[] = cart.map((item: CartItem) => item.id);
-    const dbItems = await db.query.menuItems.findMany({
-      where: inArray(menuItems.id, itemIds)
-    });
+			if (!counter || counter.status !== 'ACTIVE') {
+				return json(
+					{ success: false, error: 'This counter is temporarily out of service' },
+					{ status: 400 }
+				);
+			}
+		}
 
-    let serverTotal: number = 0;
-    
-    const validatedItems: ValidatedItem[] = cart.map((cartItem: CartItem) => {
-      const dbItem = dbItems.find(i => i.id === cartItem.id);
-      if (!dbItem || !dbItem.inStock) {
-          throw new Error(`Item ${cartItem.id} unavailable`);
-      }
+		const itemIds: string[] = cart.map((item: CartItem) => item.id);
+		const dbItems = await db.query.menuItems.findMany({
+			where: inArray(menuItems.id, itemIds)
+		});
 
-      const price: number = Number(dbItem.price);
-      serverTotal += price * cartItem.quantity;
+		let serverTotal: number = 0;
 
-      return {
-        menuItemId: dbItem.id,
-        name: dbItem.name,
-        quantity: cartItem.quantity,
-        unitPrice: price.toFixed(2),
-        itemTotal: (price * cartItem.quantity).toFixed(2)
-      };
-    });
+		const validatedItems: ValidatedItem[] = cart.map((cartItem: CartItem) => {
+			const dbItem = dbItems.find((i) => i.id === cartItem.id);
+			if (!dbItem || !dbItem.inStock) {
+				throw new Error(`Item ${cartItem.id} unavailable`);
+			}
 
-    const result = await db.transaction(async (tx) => {
-      const [updatedUser] = await tx.update(users)
-        .set({ balance: sql`${users.balance} - ${serverTotal}` })
-        .where(eq(users.id, userId))
-        .returning({ newBalance: users.balance });
+			const price: number = Number(dbItem.price);
+			serverTotal += price * cartItem.quantity;
 
-      const ticketRef: string = `NEX-${Math.floor(10000 + Math.random() * 90000)}`;
+			return {
+				menuItemId: dbItem.id,
+				name: dbItem.name,
+				quantity: cartItem.quantity,
+				unitPrice: price.toFixed(2),
+				itemTotal: (price * cartItem.quantity).toFixed(2)
+			};
+		});
 
-      const actualCounterId: string = counterId;
+		const result = await db.transaction(async (tx) => {
+			const [updatedUser] = await tx
+				.update(users)
+				.set({ balance: sql`${users.balance} - ${serverTotal}` })
+				.where(eq(users.id, userId))
+				.returning({ newBalance: users.balance });
 
-      const [newTicket] = await tx.insert(tickets)
-        .values({
-          userId,
-          counterId: actualCounterId, 
-          ticketReference: ticketRef,
-          totalAmount: serverTotal.toFixed(2),
-          status: 'PENDING',
-          printStatus: 'PENDING'
-        })
-        .returning();
+			const ticketRef: string = `NEX-${Math.floor(10000 + Math.random() * 90000)}`;
 
-      await tx.insert(ticketItems).values(
-        validatedItems.map((item: ValidatedItem) => ({
-          ticketId: newTicket.id,
-          menuItemId: item.menuItemId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice
-        }))
-      );
+			const actualCounterId: string = counterId;
 
-      await tx.insert(walletTransactions).values({
-        userId,
-        type: 'DEBIT',
-        amount: serverTotal.toFixed(2),
-        balanceAfter: updatedUser.newBalance,
-        referenceType: 'TICKET_PURCHASE',
-        ticketId: newTicket.id,
-        description: 'Canteen Checkout',
-        idempotencyKey: randomUUID(),
-      });
+			const [newTicket] = await tx
+				.insert(tickets)
+				.values({
+					userId,
+					counterId: actualCounterId,
+					ticketReference: ticketRef,
+					totalAmount: serverTotal.toFixed(2),
+					status: 'PENDING',
+					printStatus: 'PENDING'
+				})
+				.returning();
 
-      return newTicket;
-    });
+			await tx.insert(ticketItems).values(
+				validatedItems.map((item: ValidatedItem) => ({
+					ticketId: newTicket.id,
+					menuItemId: item.menuItemId,
+					quantity: item.quantity,
+					unitPrice: item.unitPrice
+				}))
+			);
 
-    if (counterId !== 'MANUAL_FALLBACK') {
-        const receiptItems: ReceiptItem[] = validatedItems.map((item: ValidatedItem) => ({
-            name: item.name,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            itemTotal: item.itemTotal
-        }));
+			await tx.insert(walletTransactions).values({
+				userId,
+				type: 'DEBIT',
+				amount: serverTotal.toFixed(2),
+				balanceAfter: updatedUser.newBalance,
+				referenceType: 'TICKET_PURCHASE',
+				ticketId: newTicket.id,
+				description: 'Canteen Checkout',
+				idempotencyKey: randomUUID()
+			});
 
-        // Send to BOTH the specific counter (for the desktop app) AND the admin dashboard
-        await pusher.trigger(['admin-orders'], 'NEW_ORDER', {
-            orderId: result.id,
-            counterId: counterId,
-            ticketReference: result.ticketReference,
-            netTotal: serverTotal.toFixed(2),
-            items: receiptItems
-        });
-    }
+			return newTicket;
+		});
 
-    return json({ success: true, data: result });
-  } catch (error: unknown) {
-    const errorMessage: string = error instanceof Error ? error.message : 'Unknown error occurred';
+		if (counterId !== 'MANUAL_FALLBACK') {
+			const receiptItems: ReceiptItem[] = validatedItems.map((item: ValidatedItem) => ({
+				name: item.name,
+				quantity: item.quantity,
+				unitPrice: item.unitPrice,
+				itemTotal: item.itemTotal
+			}));
 
-    if (errorMessage.includes('users_balance_check')) {
-      return json({ success: false, error: 'Insufficient funds' }, { status: 402 });
-    }
+			// Send to BOTH the specific counter (for the desktop app) AND the admin dashboard
+			await pusher.trigger([`counter-${counterId}`, 'admin-orders'], 'NEW_ORDER', {
+				orderId: result.id,
+				counterId: counterId,
+				ticketReference: result.ticketReference,
+				netTotal: serverTotal.toFixed(2),
+				items: receiptItems
+			});
+		}
 
-    return json({ success: false, error: errorMessage || 'Checkout failed' }, { status: 500 });
-  }
+		return json({ success: true, data: result });
+	} catch (error: unknown) {
+		const errorMessage: string = error instanceof Error ? error.message : 'Unknown error occurred';
+
+		if (errorMessage.includes('users_balance_check')) {
+			return json({ success: false, error: 'Insufficient funds' }, { status: 402 });
+		}
+
+		return json({ success: false, error: errorMessage || 'Checkout failed' }, { status: 500 });
+	}
 };
