@@ -1,17 +1,16 @@
 <script lang="ts">
 	import { ArrowLeft, Loader2, Check } from 'lucide-svelte';
 	import { resolve } from '$app/paths';
-	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
 	onMount(() => {
 		const setHeight = () => {
 			document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
-		}
-		setHeight()
-		window.addEventListener('resize', setHeight)
-		return () => window.removeEventListener('resize', setHeight)
-	})
+		};
+		setHeight();
+		window.addEventListener('resize', setHeight);
+		return () => window.removeEventListener('resize', setHeight);
+	});
 
 	let name = $state('');
 	let rollNumber = $state('');
@@ -55,87 +54,93 @@
 </script>
 
 <svelte:head>
-	<title>Create Account | Campus Wallet</title>
-	<meta name="description" content="Set up your campus profile and digital wallet." />
+	<title>Create Account | MunchUp</title>
+	<meta name="description" content="Set up your MunchUp profile and digital wallet." />
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<div class="relative mx-auto flex h-(--app-height) max-w-md flex-col overflow-hidden bg-background font-sans border-x border-neutral-400/25">
-	<header class="flex items-center justify-between border-b border-border p-5">
-		<button
-			onclick={() => goto(resolve('/login'))}
-			class="flex h-8 w-8 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+<div
+	class="animate-in fade-in relative mx-auto flex h-(--app-height) max-w-md flex-col overflow-hidden bg-background pb-6 duration-300"
+>
+	<!-- ── Header ── -->
+	<header class="flex h-16 shrink-0 items-center gap-3 px-5">
+		<a
+			href={resolve('/login')}
+			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
 		>
-			<ArrowLeft size={18} />
-		</button>
-		<span class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase"
-			>Setup Profile</span
-		>
-		<div class="w-8"></div>
+			<ArrowLeft size={18} strokeWidth={2.5} />
+		</a>
+
+		<h2 class="flex-1 text-[20px] font-bold tracking-tight text-foreground">Create Account</h2>
+
+		<!-- Spacer: fixed width w-20 so header width never changes -->
+		<div class="flex w-20 justify-end"></div>
 	</header>
 
-	<div class="flex-1 overflow-y-auto px-6 py-8">
-		<div class="mb-8">
-			<h1 class="mb-2 text-2xl leading-none font-bold tracking-tight text-foreground">
-				Create Account
-			</h1>
-			<p class="text-sm leading-relaxed font-light text-muted-foreground">
-				Enter your campus details to setup your digital wallet.
-			</p>
-		</div>
+	<!-- ── Body ── -->
+	<div class="flex-1 overflow-y-auto px-5 pt-1">
+		<p class="mb-6 text-[13px] font-medium text-foreground/50">
+			Set up your MunchUp profile and digital wallet.
+		</p>
 
-		<form onsubmit={handleRegister} class="space-y-6">
+		<form onsubmit={handleRegister} class="space-y-5">
 			{#if errorMsg}
-				<div class="border border-destructive/20 bg-destructive/10 p-3">
-					<p class="font-mono text-[10px] tracking-widest text-destructive uppercase">{errorMsg}</p>
+				<div class="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3">
+					<p class="text-[11px] font-bold text-destructive">{errorMsg}</p>
 				</div>
 			{/if}
 
 			<div class="space-y-2">
 				<label
 					for="name"
-					class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase"
-					>Full Name</label
+					class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
 				>
+					Full Name
+				</label>
 				<input
 					id="name"
 					type="text"
 					bind:value={name}
-					class="w-full border-b-2 border-border bg-transparent py-2 text-base font-medium text-foreground transition-colors outline-none placeholder:font-light focus:border-foreground"
+					class="w-full rounded-xl border border-muted/30 bg-muted/40 px-4 py-3 text-[14px] font-bold text-foreground transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/30 focus:bg-muted/60"
 					placeholder="e.g. Jane Doe"
+					autocomplete="name"
 				/>
 			</div>
 
 			<div class="space-y-2">
 				<label
 					for="rollNumber"
-					class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase"
-					>Roll No.</label
+					class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
 				>
+					Roll No.
+				</label>
 				<input
 					id="rollNumber"
 					type="text"
 					bind:value={rollNumber}
-					class="w-full border-b-2 border-border bg-transparent py-2 font-mono text-base text-foreground transition-colors outline-none placeholder:font-sans placeholder:font-light focus:border-foreground"
+					class="w-full rounded-xl border border-muted/30 bg-muted/40 px-4 py-3 font-mono text-[14px] font-bold text-foreground uppercase transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/30 focus:bg-muted/60"
 					placeholder="10445"
+					autocomplete="off"
 				/>
 			</div>
 
-			<div class="space-y-6 pt-4">
+			<div class="space-y-5 pt-2">
 				<div class="space-y-2">
 					<label
 						for="pin"
-						class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase"
-						>Create 4-Digit PIN</label
+						class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
 					>
+						Create 4-Digit PIN
+					</label>
 					<input
 						id="pin"
 						type="password"
 						inputmode="numeric"
 						maxlength="4"
 						bind:value={pin}
-						class="w-full border-b-2 border-border bg-transparent py-2 font-mono text-2xl tracking-[0.5em] text-foreground transition-colors outline-none focus:border-foreground"
+						class="w-full rounded-xl border border-muted/30 bg-muted/40 px-4 py-3 font-mono text-[20px] tracking-[0.4em] text-foreground transition-colors outline-none placeholder:text-foreground/20 focus:border-foreground/30 focus:bg-muted/60"
 						placeholder="••••"
+						autocomplete="new-password"
 					/>
 				</div>
 
@@ -143,13 +148,12 @@
 					<div class="flex items-end justify-between">
 						<label
 							for="confirmPin"
-							class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase"
-							>Confirm PIN</label
+							class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
 						>
+							Confirm PIN
+						</label>
 						{#if pin.length === 4 && confirmPin.length > 0 && !isPinMatching}
-							<span class="font-mono text-[10px] tracking-widest text-destructive uppercase"
-								>Mismatch</span
-							>
+							<span class="text-[11px] font-bold text-destructive">Mismatch</span>
 						{/if}
 					</div>
 					<input
@@ -158,32 +162,31 @@
 						inputmode="numeric"
 						maxlength="4"
 						bind:value={confirmPin}
-						class="w-full border-b-2 border-border bg-transparent py-2 font-mono text-2xl tracking-[0.5em] text-foreground transition-colors outline-none focus:border-foreground {pin.length ===
+						class="w-full rounded-xl border border-muted/30 bg-muted/40 px-4 py-3 font-mono text-[20px] tracking-[0.4em] text-foreground transition-colors outline-none placeholder:text-foreground/20 focus:border-foreground/30 focus:bg-muted/60 {pin.length ===
 							4 &&
 						confirmPin.length > 0 &&
 						!isPinMatching
-							? 'border-destructive text-destructive focus:border-destructive'
+							? 'border-destructive/40 bg-destructive/5 text-destructive focus:border-destructive'
 							: ''}"
 						placeholder="••••"
+						autocomplete="new-password"
 					/>
 				</div>
 			</div>
 
-			<div class="pt-6">
-				<button
-					type="submit"
-					disabled={!isValid || isLoading}
-					class="flex w-full items-center justify-center gap-2 bg-foreground py-4 text-sm font-medium tracking-wide text-background transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30"
-				>
-					{#if isLoading}
-						<Loader2 size={16} class="animate-spin" />
-						Creating Wallet...
-					{:else}
-						<Check size={16} />
-						Create Account
-					{/if}
-				</button>
-			</div>
+			<button
+				type="submit"
+				disabled={!isValid || isLoading}
+				class="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-[13px] font-bold text-background transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30"
+			>
+				{#if isLoading}
+					<Loader2 size={15} class="animate-spin" />
+					Creating Wallet...
+				{:else}
+					<Check size={15} />
+					Create Account
+				{/if}
+			</button>
 		</form>
 	</div>
 </div>

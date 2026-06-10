@@ -1,155 +1,364 @@
 <script lang="ts">
-    import { resolve } from '$app/paths';
-    import { appState } from '$lib/store.svelte';
-    import { Bell, Shield, LogOut, ChevronRight, History, CreditCard, Wallet, ArrowLeft, Download, CheckCircle } from 'lucide-svelte'; // Added CheckCircle
+	import { resolve } from '$app/paths';
+	import { appState } from '$lib/store.svelte';
+	import {
+		LogOut,
+		ChevronRight,
+		History,
+		CreditCard,
+		Wallet,
+		ArrowLeft,
+		Download,
+		CheckCircle,
+		KeyRound,
+		Fingerprint,
+		Users,
+		Laptop
+	} from 'lucide-svelte';
 
-    // --- PWA Installation State ---
-    interface BeforeInstallPromptEvent extends Event {
-        readonly platforms: Array<string>;
-        readonly userChoice: Promise<{
-            outcome: 'accepted' | 'dismissed',
-            platform: string
-        }>;
-        prompt(): Promise<void>;
-    }
+	interface BeforeInstallPromptEvent extends Event {
+		readonly platforms: Array<string>;
+		readonly userChoice: Promise<{
+			outcome: 'accepted' | 'dismissed';
+			platform: string;
+		}>;
+		prompt(): Promise<void>;
+	}
 
-    let deferredPrompt: BeforeInstallPromptEvent | null = $state(null);
-    let isInstalled = $state(true); 
+	let deferredPrompt: BeforeInstallPromptEvent | null = $state(null);
+	let isInstalled: boolean = $state(true);
+	let biometricsEnabled: boolean = $state(true);
 
-    $effect(() => {
-        isInstalled = 
-            window.matchMedia('(display-mode: standalone)').matches || 
-            !!(window.navigator as Navigator & { standalone?: boolean }).standalone;
+	$effect((): (() => void) => {
+		isInstalled =
+			window.matchMedia('(display-mode: standalone)').matches ||
+			!!(window.navigator as Navigator & { standalone?: boolean }).standalone;
 
-        const handleBeforeInstallPrompt = (e: Event) => {
-            e.preventDefault();
-            deferredPrompt = e as BeforeInstallPromptEvent;
-            isInstalled = false; 
-        };
+		const handleBeforeInstallPrompt = (e: Event): void => {
+			e.preventDefault();
+			deferredPrompt = e as BeforeInstallPromptEvent;
+			isInstalled = false;
+		};
 
-        const handleAppInstalled = () => {
-            isInstalled = true;
-            deferredPrompt = null;
-        };
+		const handleAppInstalled = (): void => {
+			isInstalled = true;
+			deferredPrompt = null;
+		};
 
-        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-        window.addEventListener('appinstalled', handleAppInstalled);
+		window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+		window.addEventListener('appinstalled', handleAppInstalled);
 
-        return () => {
-            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-            window.removeEventListener('appinstalled', handleAppInstalled);
-        };
-    });
+		return (): void => {
+			window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+			window.removeEventListener('appinstalled', handleAppInstalled);
+		};
+	});
 
-    async function installApp() {
-        if (deferredPrompt) {
-            // Trigger the native browser prompt
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            
-            if (outcome === 'accepted') {
-                isInstalled = true;
-                deferredPrompt = null;
-            }
-        } else {
-            // Fallback for iOS Safari or browsers where the prompt isn't supported/available
-            alert("To install this app, tap your browser's Share or Menu button, then select 'Add to Home Screen'.");
-        }
-    }
-    // ------------------------------
+	async function installApp(): Promise<void> {
+		if (deferredPrompt) {
+			deferredPrompt.prompt();
+			const { outcome }: { outcome: 'accepted' | 'dismissed' } = await deferredPrompt.userChoice;
 
-    async function executeLogout() {
-        await fetch('/api/auth/logout', { method: 'POST' });
-        window.location.href = '/login';
-    }
+			if (outcome === 'accepted') {
+				isInstalled = true;
+				deferredPrompt = null;
+			}
+		} else {
+			alert(
+				"To install this app, tap your browser's Share or Menu button, then select 'Add to Home Screen'."
+			);
+		}
+	}
+
+	async function executeLogout(): Promise<void> {
+		await fetch('/api/auth/logout', { method: 'POST' });
+		window.location.href = '/login';
+	}
+
+	async function switchProfile(): Promise<void> {
+		window.location.href = '/login?action=switch';
+	}
+
+	async function logoutAllDevices(): Promise<void> {
+		await fetch('/api/auth/logout-all', { method: 'POST' });
+		window.location.href = '/login';
+	}
 </script>
 
-<svelte:head><title>Account Profile | Campus Wallet</title></svelte:head>
+<svelte:head><title>Profile | MunchUp</title></svelte:head>
 
-<div class="flex flex-col h-full animate-in fade-in duration-200">
-    <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background p-4 pt-1">
-        <a href={resolve("/")} class="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-            <ArrowLeft size={18} />
-        </a>
-        <div class="min-w-0 flex-1"><h2 class="text-base leading-none font-semibold tracking-tight text-foreground">Profile</h2></div>
-    </header>
+<div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
+	<!-- ── Header: fixed height h-16, matches menu and ticket screens ── -->
+	<header
+		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
+	>
+		<a
+			href={resolve('/')}
+			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
+		>
+			<ArrowLeft size={18} strokeWidth={2.5} />
+		</a>
 
-    {#if appState.wallet}
-        <div class="flex-1 overflow-y-auto py-5 space-y-4 pb-6 animate-in slide-in-from-left-2 duration-300 p-4">
-            <div class="bg-card border border-border p-5 flex items-center gap-4">
-                <div class="w-12 h-12 border border-border flex items-center justify-center shrink-0">
-                    <span class="font-mono text-lg font-medium text-foreground">{appState.wallet.name.charAt(0)}</span>
-                </div>
-                <div class="min-w-0">
-                    <h3 class="text-base font-semibold text-foreground tracking-tight leading-none">{appState.wallet.name}</h3>
-                    <div class="flex items-center gap-3 mt-1.5">
-                        <span class="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">{appState.wallet.studentId}</span>
-                        <span class="w-px h-3 bg-border"></span>
-                        <span class="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Roll {appState.wallet.rollNumber}</span>
-                    </div>
-                </div>
-            </div>
+		<h2 class="flex-1 text-[20px] font-bold tracking-tight text-foreground">Profile</h2>
 
-            <div class="bg-card border border-border overflow-hidden">
-                <div class="px-5 py-3 border-b border-border flex items-center gap-2">
-                    <Wallet size={12} class="text-muted-foreground" />
-                    <span class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Campus Wallet</span>
-                </div>
-                <div class="px-5 py-5">
-                    <div class="mb-5">
-                        <span class="font-mono text-muted-foreground text-sm mr-1">₹</span>
-                        <span class="text-4xl font-semibold text-foreground tracking-tight">{appState.wallet.balance.toFixed(2)}</span>
-                    </div>
-                    <a href={resolve("/topup")} class="w-full py-3 border border-border text-foreground text-xs font-medium tracking-wide flex items-center justify-center gap-2 hover:bg-muted transition-colors active:scale-[0.98]">
-                        <CreditCard size={13} /> Top Up Wallet
-                    </a>
-                </div>
-            </div>
+		<!-- Spacer: fixed width w-20 so header width never changes -->
+		<div class="flex w-20 justify-end"></div>
+	</header>
 
-            <div>
-                <p class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2 px-1">Account</p>
-                <div class="bg-card border border-border divide-y divide-border">
-                    <a href={resolve("/profile/history")} class="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors active:scale-[0.99]">
-                        <div class="flex items-center gap-3"><History size={15} class="text-muted-foreground" /><span class="text-sm text-foreground">Transaction History</span></div>
-                        <ChevronRight size={14} class="text-muted-foreground" />
-                    </a>
-                    <a href={resolve("/profile/notifications")} class="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors active:scale-[0.99]">
-                        <div class="flex items-center gap-3"><Bell size={15} class="text-muted-foreground" /><span class="text-sm text-foreground">Notifications</span></div>
-                        <ChevronRight size={14} class="text-muted-foreground" />
-                    </a>
-                    <a href={resolve("/profile/security")} class="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors active:scale-[0.99]">
-                        <div class="flex items-center gap-3"><Shield size={15} class="text-muted-foreground" /><span class="text-sm text-foreground">Security & PIN</span></div>
-                        <ChevronRight size={14} class="text-muted-foreground" />
-                    </a>
-                    
-                    {#if isInstalled}
-                        <div class="w-full flex items-center justify-between px-5 py-4 bg-muted/20">
-                            <div class="flex items-center gap-3">
-                                <CheckCircle size={15} class="text-emerald-500" />
-                                <span class="text-sm text-foreground">App Installed</span>
-                            </div>
-                            <span class="font-mono text-[10px] text-emerald-500 uppercase tracking-widest">Active</span>
-                        </div>
-                    {:else}
-                        <button onclick={installApp} class="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors active:scale-[0.99]">
-                            <div class="flex items-center gap-3">
-                                <Download size={15} class="text-muted-foreground" />
-                                <span class="text-sm text-foreground">Install App</span>
-                            </div>
-                            <ChevronRight size={14} class="text-muted-foreground" />
-                        </button>
-                    {/if}
-                </div>
-            </div>
+	{#if appState.wallet}
+		<div class="space-y-4 px-5 pt-1">
+			<!-- User Info Card -->
+			<div
+				class="flex items-center gap-4 rounded-[20px] border border-muted/30 bg-card p-4 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+			>
+				<div
+					class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-muted/50 text-[20px] font-black text-foreground/60"
+				>
+					{appState.wallet.name.charAt(0)}
+				</div>
+				<div class="min-w-0 flex-1">
+					<h3 class="truncate text-[16px] font-bold text-foreground">
+						{appState.wallet.name}
+					</h3>
+					<div class="mt-1 flex items-center gap-2">
+						<span
+							class="rounded-md bg-muted/50 px-2 py-0.5 text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
+						>
+							{appState.wallet.studentId}
+						</span>
+						<span
+							class="rounded-md bg-muted/50 px-2 py-0.5 text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
+						>
+							Roll {appState.wallet.rollNumber}
+						</span>
+					</div>
+				</div>
+			</div>
 
-            <div class="flex justify-between items-center px-1">
-                <span class="font-mono text-[10px] text-muted-foreground/50 uppercase tracking-widest">BPS Canteen v0.0.2</span>
-                <span class="font-mono text-[10px] text-muted-foreground/50 uppercase tracking-widest">Bangalore</span>
-            </div>
+			<!-- Wallet Card -->
+			<div
+				class="relative overflow-hidden rounded-3xl bg-accent bg-linear-to-br from-primary/40 via-accent to-primary/25 px-5 py-5 shadow-[0_4px_24px_rgba(15,37,68,0.18)]"
+			>
+				<div class="relative">
+					<div class="flex items-center gap-2">
+						<Wallet size={13} strokeWidth={2.5} class="text-white/40" />
+						<span class="text-[10px] font-bold tracking-[0.15em] text-white/40 uppercase"
+							>Campus Wallet</span
+						>
+					</div>
+					<div class="mt-2 flex items-end justify-between">
+						<div>
+							<span class="text-[32px] font-bold tracking-tight text-white"
+								>₹{appState.wallet.balance.toFixed(2)}</span
+							>
+						</div>
+						<a
+							href={resolve('/topup')}
+							class="mb-1 flex items-center gap-1.5 rounded-full border border-white/25 bg-white/15 px-4 py-1.5 text-sm font-black text-white backdrop-blur-sm transition-all hover:border-primary/50 hover:bg-primary/25 active:scale-95 active:bg-white/20"
+						>
+							<CreditCard size={14} strokeWidth={2.5} /> Top Up
+						</a>
+					</div>
+				</div>
+			</div>
 
-            <button onclick={executeLogout} class="w-full py-3.5 border border-destructive/25 text-destructive text-sm font-medium tracking-wide flex items-center justify-center gap-2 hover:bg-destructive/5 transition-colors active:scale-[0.98]">
-                <LogOut size={15} /> Sign Out
-            </button>
-        </div>
-    {/if}
+			<!-- Main Options List -->
+			<div>
+				<div
+					class="overflow-hidden rounded-3xl border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+				>
+					<div class="divide-y divide-muted/20">
+						<!-- Transaction History -->
+						<a
+							href={resolve('/profile/history')}
+							class="flex w-full items-center justify-between px-4 py-4 transition-colors active:bg-muted/30"
+						>
+							<div class="flex items-center gap-3.5 text-left">
+								<div
+									class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/40"
+								>
+									<History size={16} strokeWidth={2.5} class="text-foreground/70" />
+								</div>
+								<div>
+									<span class="block text-[14px] font-bold text-foreground"
+										>Transaction History</span
+									>
+									<span class="mt-0.5 block text-[11px] font-medium text-foreground/50"
+										>View past orders and top-ups</span
+									>
+								</div>
+							</div>
+							<ChevronRight size={16} strokeWidth={2.5} class="text-foreground/30" />
+						</a>
+
+						<!-- Change PIN -->
+						<a
+							href={resolve('/profile/pin')}
+							class="flex w-full items-center justify-between px-4 py-4 transition-colors active:bg-muted/30"
+						>
+							<div class="flex items-center gap-3.5 text-left">
+								<div
+									class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/40"
+								>
+									<KeyRound size={16} strokeWidth={2.5} class="text-foreground/70" />
+								</div>
+								<div>
+									<span class="block text-[14px] font-bold text-foreground"
+										>Change Security PIN</span
+									>
+									<span class="mt-0.5 block text-[11px] font-medium text-foreground/50"
+										>Update your 4-digit transaction PIN</span
+									>
+								</div>
+							</div>
+							<ChevronRight size={16} strokeWidth={2.5} class="text-foreground/30" />
+						</a>
+
+						<!-- Biometrics Toggle -->
+						<button
+							onclick={() => (biometricsEnabled = !biometricsEnabled)}
+							class="flex w-full items-center justify-between px-4 py-4 transition-colors active:bg-muted/30"
+						>
+							<div class="flex items-center gap-3.5 text-left">
+								<div
+									class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/40"
+								>
+									<Fingerprint size={16} strokeWidth={2.5} class="text-foreground/70" />
+								</div>
+								<div>
+									<span class="block text-[14px] font-bold text-foreground">Biometric Login</span>
+									<span class="mt-0.5 block text-[11px] font-medium text-foreground/50"
+										>Use fingerprint or Face ID</span
+									>
+								</div>
+							</div>
+							<div
+								class="relative h-6 w-10 shrink-0 rounded-full transition-colors duration-200 ease-in-out {biometricsEnabled
+									? 'bg-emerald-500'
+									: 'bg-muted/80'}"
+							>
+								<div
+									class="absolute top-1 left-1 h-4 w-4 rounded-full bg-white transition-transform duration-200 ease-in-out {biometricsEnabled
+										? 'translate-x-4 shadow-[0_2px_4px_rgba(0,0,0,0.2)]'
+										: 'translate-x-0'}"
+								></div>
+							</div>
+						</button>
+
+						<!-- PWA Install Status -->
+						{#if isInstalled}
+							<div class="flex items-center justify-between bg-muted/10 px-4 py-4">
+								<div class="flex items-center gap-3.5 text-left">
+									<div
+										class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10"
+									>
+										<CheckCircle size={16} strokeWidth={2.5} class="text-emerald-500" />
+									</div>
+									<div>
+										<span class="block text-[14px] font-bold text-foreground">App Installed</span>
+										<span class="mt-0.5 block text-[11px] font-medium text-foreground/50"
+											>Running natively on your device</span
+										>
+									</div>
+								</div>
+								<span class="text-[10px] font-bold tracking-widest text-emerald-500 uppercase"
+									>Active</span
+								>
+							</div>
+						{:else}
+							<button
+								onclick={installApp}
+								class="flex w-full items-center justify-between px-4 py-4 transition-colors active:bg-muted/30"
+							>
+								<div class="flex items-center gap-3.5 text-left">
+									<div
+										class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/40"
+									>
+										<Download size={16} strokeWidth={2.5} class="text-foreground/70" />
+									</div>
+									<div>
+										<span class="block text-[14px] font-bold text-foreground">Install App</span>
+										<span class="mt-0.5 block text-[11px] font-medium text-foreground/50"
+											>Add MunchUp to your homescreen</span
+										>
+									</div>
+								</div>
+								<ChevronRight size={16} strokeWidth={2.5} class="text-foreground/30" />
+							</button>
+						{/if}
+					</div>
+				</div>
+			</div>
+
+			<!-- Session & Account Actions -->
+			<div>
+				<div
+					class="overflow-hidden rounded-3xl border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+				>
+					<div class="divide-y divide-muted/20">
+						<!-- Switch Profile -->
+						<button
+							onclick={switchProfile}
+							class="flex w-full items-center justify-between px-4 py-4 transition-colors active:bg-muted/30"
+						>
+							<div class="flex items-center gap-3.5 text-left">
+								<div
+									class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/40"
+								>
+									<Users size={16} strokeWidth={2.5} class="text-foreground/70" />
+								</div>
+								<div>
+									<span class="block text-[14px] font-bold text-foreground">Switch Profile</span>
+									<span class="mt-0.5 block text-[11px] font-medium text-foreground/50"
+										>Sign in with a different account</span
+									>
+								</div>
+							</div>
+							<ChevronRight size={16} strokeWidth={2.5} class="text-foreground/30" />
+						</button>
+
+						<!-- Logout of All Devices -->
+						<button
+							onclick={logoutAllDevices}
+							class="flex w-full items-center justify-between px-4 py-4 transition-colors active:bg-muted/30"
+						>
+							<div class="flex items-center gap-3.5 text-left">
+								<div
+									class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500/10"
+								>
+									<Laptop size={16} strokeWidth={2.5} class="text-amber-500" />
+								</div>
+								<div>
+									<span class="block text-[14px] font-bold text-foreground">Logout All Devices</span
+									>
+									<span class="mt-0.5 block text-[11px] font-medium text-foreground/50"
+										>End every active session</span
+									>
+								</div>
+							</div>
+							<ChevronRight size={16} strokeWidth={2.5} class="text-foreground/30" />
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<div class="space-y-4 pt-4">
+				<button
+					onclick={executeLogout}
+					class="flex w-full items-center justify-center gap-2 rounded-full border border-destructive/20 bg-destructive/5 py-3.5 text-[13px] font-bold text-destructive transition-colors active:scale-[0.98] active:bg-destructive/10"
+				>
+					<LogOut size={14} strokeWidth={2.5} /> Sign Out
+				</button>
+
+				<div class="flex items-center justify-between px-2 pb-6">
+					<span class="text-[10px] font-bold tracking-widest text-foreground/40 uppercase"
+						>MunchUp v1.0.0</span
+					>
+					<span class="text-[10px] font-bold tracking-widest text-foreground/40 uppercase"
+						>Shivamogga</span
+					>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>

@@ -1,346 +1,501 @@
 <script lang="ts">
-    import { appState } from '$lib/store.svelte';
-    import { goto } from '$app/navigation';
-    import { ArrowLeft, QrCode, ScanLine, CheckCircle, X, Hash, ShoppingBag, Loader2 } from 'lucide-svelte';
-    import jsQR from 'jsqr';
-    import { resolve } from '$app/paths';
+	import { appState } from '$lib/store.svelte';
+	import { goto } from '$app/navigation';
+	import {
+		ArrowLeft,
+		QrCode,
+		ScanLine,
+		CheckCircle,
+		X,
+		Hash,
+		ShoppingBag,
+		Loader2
+	} from 'lucide-svelte';
+	import jsQR from 'jsqr';
+	import type { QRCode } from 'jsqr';
+	import { resolve } from '$app/paths';
 
-    type ScanState = 'idle' | 'starting' | 'scanning' | 'success' | 'error';
-    type FallbackState = 'hidden' | 'open' | 'submitting' | 'confirmed';
+	type ScanState = 'idle' | 'starting' | 'scanning' | 'success' | 'error';
+	type FallbackState = 'hidden' | 'open' | 'submitting' | 'confirmed';
 
-    let scanState: ScanState = $state('idle');
-    let fallbackState: FallbackState = $state('hidden');
-    let manualOrderId: string = $state('');
-    let manualError: string = $state('');
+	let scanState: ScanState = $state('idle');
+	let fallbackState: FallbackState = $state('hidden');
+	let manualOrderId: string = $state('');
+	let manualError: string = $state('');
 
-    let videoEl: HTMLVideoElement | undefined = $state();
-    let canvasEl: HTMLCanvasElement | undefined = $state();
-    let stream: MediaStream | null = null;
-    let animationFrameId: number;
+	let videoEl: HTMLVideoElement | undefined = $state();
+	let canvasEl: HTMLCanvasElement | undefined = $state();
+	let stream: MediaStream | null = null;
+	let animationFrameId: number;
 
-    $effect(() => {
-        return () => stopCamera();
-    });
+	$effect(() => {
+		return () => stopCamera();
+	});
 
-    async function startCamera(): Promise<void> {
-        scanState = 'starting';
-        manualError = '';
+	async function startCamera(): Promise<void> {
+		scanState = 'starting';
+		manualError = '';
 
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' }
-            });
-            
-            scanState = 'scanning';
-            
-            setTimeout(() => {
-                if (videoEl) {
-                    videoEl.srcObject = stream;
-                    videoEl.setAttribute('playsinline', 'true');
-                    videoEl.play();
-                    requestAnimationFrame(scanLoop);
-                }
-            }, 50);
+		try {
+			stream = await navigator.mediaDevices.getUserMedia({
+				video: { facingMode: 'environment' }
+			});
 
-        } catch (err: unknown) {
-            console.error(err);
-            scanState = 'error';
-            manualError = 'Camera access denied. Please use manual entry.';
-        }
-    }
+			scanState = 'scanning';
 
-    function scanLoop(): void {
-        if (scanState !== 'scanning' || !videoEl || !canvasEl) return;
+			setTimeout(() => {
+				if (videoEl) {
+					videoEl.srcObject = stream;
+					videoEl.setAttribute('playsinline', 'true');
+					videoEl.play();
+					requestAnimationFrame(scanLoop);
+				}
+			}, 50);
+		} catch (err: unknown) {
+			console.error(err);
+			scanState = 'error';
+			manualError = 'Camera access denied. Please use manual entry.';
+		}
+	}
 
-        if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
-            canvasEl.height = videoEl.videoHeight;
-            canvasEl.width = videoEl.videoWidth;
-            const ctx: CanvasRenderingContext2D | null = canvasEl.getContext('2d', { willReadFrequently: true });
-            
-            if (ctx) {
-                ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-                const imageData: ImageData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
-                
-                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: 'dontInvert'
-                });
+	function scanLoop(): void {
+		if (scanState !== 'scanning' || !videoEl || !canvasEl) return;
 
-                if (code) {
-                    const rawData: string = code.data.trim();
+		if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
+			canvasEl.height = videoEl.videoHeight;
+			canvasEl.width = videoEl.videoWidth;
+			const ctx: CanvasRenderingContext2D | null = canvasEl.getContext('2d', {
+				willReadFrequently: true
+			});
 
-                    // If it contains a colon, we assume it's our encrypted "ivHex:encryptedHex" format
-                    if (rawData.includes(':') && rawData.length > 30) {
-                        handleSuccessfulScan(rawData);
-                    } else {
-                        stopCamera();
-                        scanState = 'error';
-                        manualError = 'Invalid QR code. Please scan a valid counter QR.';
-                    }
-                    return;
-                }
-            }
-        }
-        animationFrameId = requestAnimationFrame(scanLoop);
-    }
+			if (ctx) {
+				ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+				const imageData: ImageData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
 
-    async function handleSuccessfulScan(securePayload: string): Promise<void> {
-        stopCamera();
-        scanState = 'success';
-        await handleCollected(securePayload);
-    }
+				const code: QRCode | null = jsQR(imageData.data, imageData.width, imageData.height, {
+					inversionAttempts: 'dontInvert'
+				});
 
-    function stopCamera(): void {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            stream = null;
-        }
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-        }
-    }
+				if (code) {
+					const rawData: string = code.data.trim();
 
-    function resetScan(): void {
-        stopCamera();
-        scanState = 'idle';
-    }
+					if (rawData.includes(':') && rawData.length > 30) {
+						handleSuccessfulScan(rawData);
+					} else {
+						stopCamera();
+						scanState = 'error';
+						manualError = 'Invalid QR code. Please scan a valid counter QR.';
+					}
+					return;
+				}
+			}
+		}
+		animationFrameId = requestAnimationFrame(scanLoop);
+	}
 
-    function openFallback(): void {
-        stopCamera();
-        scanState = 'idle';
-        fallbackState = 'open';
-        manualOrderId = '';
-        manualError = '';
-    }
+	async function handleSuccessfulScan(securePayload: string): Promise<void> {
+		stopCamera();
+		scanState = 'success';
+		await handleCollected(securePayload);
+	}
 
-    function closeFallback(): void {
-        fallbackState = 'hidden';
-        manualOrderId = '';
-        manualError = '';
-    }
+	function stopCamera(): void {
+		if (stream) {
+			stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+			stream = null;
+		}
+		if (animationFrameId) {
+			cancelAnimationFrame(animationFrameId);
+		}
+	}
 
-    function submitManual(): void {
-        if (manualOrderId.trim().toUpperCase() !== appState.activeTicket?.id) {
-            manualError = 'Order ID does not match — ask staff to verify';
-            return;
-        }
-        fallbackState = 'submitting';
-        setTimeout(async () => {
-            fallbackState = 'confirmed';
-            await handleCollected('MANUAL_FALLBACK'); 
-        }, 1500);
-    }
+	function resetScan(): void {
+		stopCamera();
+		scanState = 'idle';
+	}
 
-    async function handleCollected(securePayload: string): Promise<void> {
-        if (appState.activeTicket && appState.wallet) {
-            try {
-                const payload = appState.activeTicket.items.map(i => ({ id: i.menuItem.id, quantity: i.quantity }));
-                
-                const response: Response = await fetch('/api/checkout', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        cart: payload,
-                        securePayload: securePayload 
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    appState.wallet.balance -= appState.activeTicket.total;
-                    appState.activeTicket = { ...appState.activeTicket, status: 'COMPLETED' };
-                    appState.activeTicket = null;
-                    goto(resolve('/'));
-                } else {
-                    scanState = 'error';
-                    manualError = result.error || 'Checkout failed. Please try again.';
-                    fallbackState = 'hidden';
-                }
-            } catch (err: unknown) {
-                console.error(err);
-                scanState = 'error';
-                manualError = 'Network error. Could not connect to the server.';
-            }
-        }
-    }
+	function openFallback(): void {
+		stopCamera();
+		scanState = 'idle';
+		fallbackState = 'open';
+		manualOrderId = '';
+		manualError = '';
+	}
+
+	function closeFallback(): void {
+		fallbackState = 'hidden';
+		manualOrderId = '';
+		manualError = '';
+	}
+
+	function submitManual(): void {
+		if (manualOrderId.trim().toUpperCase() !== appState.activeTicket?.id) {
+			manualError = 'Order ID does not match — ask staff to verify';
+			return;
+		}
+		fallbackState = 'submitting';
+		setTimeout(async () => {
+			fallbackState = 'confirmed';
+			await handleCollected('MANUAL_FALLBACK');
+		}, 1500);
+	}
+
+	async function handleCollected(securePayload: string): Promise<void> {
+		if (appState.activeTicket && appState.wallet) {
+			try {
+				const payload: { id: string; quantity: number }[] = appState.activeTicket.items.map(
+					(i) => ({
+						id: i.menuItem.id,
+						quantity: i.quantity
+					})
+				);
+
+				const response: Response = await fetch('/api/checkout', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						cart: payload,
+						securePayload: securePayload
+					})
+				});
+
+				const result: { success: boolean; error?: string } = await response.json();
+
+				if (result.success) {
+					appState.wallet.balance -= appState.activeTicket.total;
+					appState.activeTicket = { ...appState.activeTicket, status: 'COMPLETED' };
+					appState.activeTicket = null;
+					goto(resolve('/'));
+				} else {
+					scanState = 'error';
+					manualError = result.error || 'Checkout failed. Please try again.';
+					fallbackState = 'hidden';
+				}
+			} catch (err: unknown) {
+				console.error(err);
+				scanState = 'error';
+				manualError = 'Network error. Could not connect to the server.';
+			}
+		}
+	}
 </script>
 
-<svelte:head><title>Your Ticket | BPS Canteen</title></svelte:head>
+<svelte:head><title>Your Ticket | MunchUp</title></svelte:head>
 
-<div class="animate-in fade-in flex h-full flex-col duration-200">
-    <header class="flex items-center gap-3 border-b border-border bg-background p-4 pt-1">
-        <a href={resolve("/")} onclick={stopCamera} class="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-            <ArrowLeft size={18} />
-        </a>
-        <div class="min-w-0 flex-1">
-            <h2 class="text-base leading-none font-semibold tracking-tight text-foreground">Order Ticket</h2>
-        </div>
-        {#if (appState.activeTicket?.items.length ?? 0) > 0}
-            <div class="flex items-center gap-1.5">
-                <ShoppingBag size={14} class="text-muted-foreground" />
-                <span class="font-mono text-xs text-foreground">{appState.activeTicket?.items.length}</span>
-            </div>
-        {/if}
-    </header>
+<div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
+	<header
+		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
+	>
+		<a
+			href={resolve('/')}
+			onclick={stopCamera}
+			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
+		>
+			<ArrowLeft size={18} strokeWidth={2.5} />
+		</a>
 
-    <div class="flex-1 overflow-scroll">
-    {#if appState.activeTicket}
-        <div class="flex-1 space-y-4 overflow-y-auto p-4">
-            <div class="flex items-center">
-                <div class="flex items-center gap-2">
-                    <div class="flex h-5 w-5 shrink-0 items-center justify-center border border-emerald-500">
-                        <div class="h-2 w-2 bg-emerald-500"></div>
-                    </div>
-                    <span class="font-mono text-[10px] tracking-widest text-emerald-400 uppercase">Placed</span>
-                </div>
-                <div class="mx-3 h-px flex-1 bg-border"></div>
-                <div class="flex items-center gap-2">
-                    <div class="flex h-5 w-5 shrink-0 items-center justify-center border {scanState === 'success' || fallbackState === 'confirmed' ? 'border-emerald-500' : 'border-amber-400'}">
-                        <div class="h-2 w-2 {scanState === 'success' || fallbackState === 'confirmed' ? 'bg-emerald-500' : 'animate-pulse bg-amber-400'}"></div>
-                    </div>
-                    <span class="font-mono text-[10px] tracking-widest uppercase {scanState === 'success' || fallbackState === 'confirmed' ? 'text-emerald-400' : 'text-amber-400'}">
-                        {scanState === 'success' || fallbackState === 'confirmed' ? 'Collected' : 'Collect'}
-                    </span>
-                </div>
-            </div>
+		<h2 class="flex-1 text-[20px] font-bold tracking-tight text-foreground">Order Ticket</h2>
 
-            <div class="flex items-start gap-3 border border-border bg-card px-4 py-3">
-                <div class="mt-0.5 h-full w-1 shrink-0 self-stretch bg-amber-400/40"></div>
-                <p class="font-mono text-[10px] leading-relaxed tracking-wider text-muted-foreground uppercase">
-                    ₹{appState.activeTicket.total} will be deducted from your wallet only when you scan the counter QR and collect your order.
-                </p>
-            </div>
+		<div class="flex w-20 justify-end">
+			{#if (appState.activeTicket?.items.length ?? 0) > 0}
+				<div class="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5">
+					<ShoppingBag size={15} strokeWidth={2.5} class="text-primary" />
+					<span class="text-[13px] font-bold text-primary"
+						>{appState.activeTicket?.items.length}</span
+					>
+				</div>
+			{/if}
+		</div>
+	</header>
 
-            {#if scanState === 'idle' || scanState === 'starting' || scanState === 'scanning'}
-                <div class="flex flex-col items-center gap-5 border border-border bg-card p-6">
-                    <div class="relative aspect-square w-full max-w-xs overflow-hidden bg-black/5">
-                        <canvas bind:this={canvasEl} class="hidden"></canvas>
-                        <video bind:this={videoEl} class="absolute inset-0 h-full w-full object-cover opacity-80" class:hidden={scanState !== 'scanning'} muted playsinline></video>
+	<div class="px-5 pt-1">
+		{#if appState.activeTicket}
+			<div class="space-y-3">
+				{#if scanState === 'idle' || scanState === 'starting' || scanState === 'scanning'}
+					<div
+						class="flex flex-col items-center gap-3 rounded-[20px] border border-muted/30 bg-card p-4 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					>
+						<div class="relative aspect-square w-full overflow-hidden rounded-2xl bg-muted/20">
+							<canvas bind:this={canvasEl} class="hidden"></canvas>
+							<video
+								bind:this={videoEl}
+								class="absolute inset-0 h-full w-full object-cover opacity-90"
+								class:hidden={scanState !== 'scanning'}
+								muted
+								playsinline
+							></video>
 
-                        {#if scanState === 'idle'}
-                            <div class="absolute inset-0 flex items-center justify-center bg-card"><ScanLine size={64} class="text-muted-foreground/25" strokeWidth={1} /></div>
-                            <div class="absolute top-0 left-0 h-8 w-8 border-t-2 border-l-2 border-foreground/40"></div><div class="absolute top-0 right-0 h-8 w-8 border-t-2 border-r-2 border-foreground/40"></div><div class="absolute bottom-0 left-0 h-8 w-8 border-b-2 border-l-2 border-foreground/40"></div><div class="absolute right-0 bottom-0 h-8 w-8 border-r-2 border-b-2 border-foreground/40"></div>
-                        {/if}
-                        {#if scanState === 'starting'}
-                            <div class="absolute inset-0 flex items-center justify-center bg-card animate-pulse"><ScanLine size={64} class="text-muted-foreground/25" strokeWidth={1} /></div>
-                            <div class="absolute top-0 left-0 h-8 w-8 border-t-2 border-l-2 border-foreground/40 animate-pulse"></div><div class="absolute top-0 right-0 h-8 w-8 border-t-2 border-r-2 border-foreground/40 animate-pulse"></div><div class="absolute bottom-0 left-0 h-8 w-8 border-b-2 border-l-2 border-foreground/40 animate-pulse"></div><div class="absolute right-0 bottom-0 h-8 w-8 border-r-2 border-b-2 border-foreground/40 animate-pulse"></div>
-                        {/if}
-                        {#if scanState === 'scanning'}
-                            <div class="absolute top-0 left-0 h-8 w-8 border-t-2 border-l-2 border-emerald-500/80"></div><div class="absolute top-0 right-0 h-8 w-8 border-t-2 border-r-2 border-emerald-500/80"></div><div class="absolute bottom-0 left-0 h-8 w-8 border-b-2 border-l-2 border-emerald-500/80"></div><div class="absolute right-0 bottom-0 h-8 w-8 border-r-2 border-b-2 border-emerald-500/80"></div>
-                            <div class="absolute right-3 left-3 h-0.5 animate-[scan_1.5s_ease-in-out_infinite] bg-emerald-400/80 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
-                        {/if}
-                    </div>
+							{#if scanState === 'idle'}
+								<div class="absolute inset-0 flex items-center justify-center bg-card/60">
+									<ScanLine size={48} class="text-foreground/30" strokeWidth={1.5} />
+								</div>
+								<div
+									class="absolute top-4 left-4 h-10 w-10 rounded-tl-2xl border-t-[3px] border-l-[3px] border-foreground/40"
+								></div>
+								<div
+									class="absolute top-4 right-4 h-10 w-10 rounded-tr-2xl border-t-[3px] border-r-[3px] border-foreground/40"
+								></div>
+								<div
+									class="absolute bottom-4 left-4 h-10 w-10 rounded-bl-2xl border-b-[3px] border-l-[3px] border-foreground/40"
+								></div>
+								<div
+									class="absolute right-4 bottom-4 h-10 w-10 rounded-br-2xl border-r-[3px] border-b-[3px] border-foreground/40"
+								></div>
+							{/if}
+							{#if scanState === 'starting'}
+								<div
+									class="absolute inset-0 flex animate-pulse items-center justify-center bg-card/60"
+								>
+									<ScanLine size={48} class="text-foreground/30" strokeWidth={1.5} />
+								</div>
+								<div
+									class="absolute top-4 left-4 h-10 w-10 animate-pulse rounded-tl-2xl border-t-[3px] border-l-[3px] border-foreground/40"
+								></div>
+								<div
+									class="absolute top-4 right-4 h-10 w-10 animate-pulse rounded-tr-2xl border-t-[3px] border-r-[3px] border-foreground/40"
+								></div>
+								<div
+									class="absolute bottom-4 left-4 h-10 w-10 animate-pulse rounded-bl-2xl border-b-[3px] border-l-[3px] border-foreground/40"
+								></div>
+								<div
+									class="absolute right-4 bottom-4 h-10 w-10 animate-pulse rounded-br-2xl border-r-[3px] border-b-[3px] border-foreground/40"
+								></div>
+							{/if}
+							{#if scanState === 'scanning'}
+								<div
+									class="absolute top-4 left-4 h-10 w-10 rounded-tl-2xl border-t-[3px] border-l-[3px] border-emerald-500"
+								></div>
+								<div
+									class="absolute top-4 right-4 h-10 w-10 rounded-tr-2xl border-t-[3px] border-r-[3px] border-emerald-500"
+								></div>
+								<div
+									class="absolute bottom-4 left-4 h-10 w-10 rounded-bl-2xl border-b-[3px] border-l-[3px] border-emerald-500"
+								></div>
+								<div
+									class="absolute right-4 bottom-4 h-10 w-10 rounded-br-2xl border-r-[3px] border-b-[3px] border-emerald-500"
+								></div>
+							{/if}
+						</div>
 
-                    {#if scanState === 'idle'}
-                        <button onclick={startCamera} class="flex w-full items-center justify-center gap-2 bg-foreground py-3.5 text-sm font-medium tracking-wide text-background transition-all active:scale-[0.98]">
-                            <ScanLine size={15} /> Open Camera · Scan Counter QR
-                        </button>
-                    {:else if scanState === 'starting'}
-                        <p class="flex w-full items-center justify-center gap-2 bg-foreground py-3.5 text-sm font-medium tracking-wide text-background transition-all"><Loader2 size={15} class="animate-spin" /> Accessing Camera</p>
-                    {:else if scanState === 'scanning'}
-                        <button onclick={resetScan} class="w-full border border-border py-3.5 text-xs font-medium tracking-wide text-foreground transition-colors hover:bg-muted">Cancel Scan</button>
-                    {/if}
-                </div>
-            {:else if scanState === 'success'}
-                <div class="flex flex-col items-center gap-4 border border-emerald-500/25 bg-card p-6">
-                    <div class="flex h-14 w-14 items-center justify-center border border-emerald-500/40"><CheckCircle size={26} class="text-emerald-400" strokeWidth={1.5} /></div>
-                    <div class="text-center">
-                        <h3 class="text-sm font-medium text-foreground">Order Collected</h3>
-                        <p class="mt-1 font-mono text-[10px] tracking-widest text-emerald-400 uppercase">₹{appState.activeTicket.total} deducted from wallet</p>
-                    </div>
-                </div>
-            {:else if scanState === 'error'}
-                <div class="flex flex-col items-center gap-4 border border-destructive/25 bg-card p-6">
-                    <div class="flex h-14 w-14 items-center justify-center border border-destructive/40"><X size={22} class="text-destructive" /></div>
-                    <div class="text-center">
-                        <h3 class="text-sm font-medium text-foreground">Scan Failed</h3>
-                        <p class="mt-1 font-mono text-[10px] tracking-widest text-muted-foreground uppercase">{manualError || 'Could not read the counter QR'}</p>
-                    </div>
-                    <button onclick={resetScan} class="w-full border border-border py-3 text-xs font-medium tracking-wide text-foreground transition-colors hover:bg-muted">Try Again</button>
-                </div>
-            {/if}
+						{#if scanState === 'idle'}
+							<button
+								onclick={startCamera}
+								class="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-[12px] font-bold text-background transition-all active:scale-[0.98]"
+							>
+								<ScanLine size={14} strokeWidth={2.5} /> Scan Counter QR
+							</button>
+						{:else if scanState === 'starting'}
+							<p
+								class="flex w-full items-center justify-center gap-2 rounded-full bg-muted py-3 text-[12px] font-bold text-foreground transition-all"
+							>
+								<Loader2 size={14} strokeWidth={2.5} class="animate-spin" /> Accessing Camera
+							</p>
+						{:else if scanState === 'scanning'}
+							<button
+								onclick={resetScan}
+								class="w-full rounded-full border border-muted/50 bg-card py-3 text-[12px] font-bold text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
+							>
+								Cancel Scan
+							</button>
+						{/if}
+					</div>
+					<div class="flex items-start gap-2 rounded-2xl bg-amber-400/10 px-4 py-3 text-amber-600">
+						<span class="text-[12px] leading-relaxed font-medium">
+							<strong class="font-bold">₹{appState.activeTicket.total}</strong> will be deducted from
+							your wallet only when you scan the counter QR and collect your order.
+						</span>
+					</div>
+				{:else if scanState === 'success'}
+					<div
+						class="flex flex-col items-center gap-3 rounded-[20px] border border-emerald-500/25 bg-emerald-500/5 p-4 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					>
+						<div class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20">
+							<CheckCircle size={22} class="text-emerald-500" strokeWidth={2.5} />
+						</div>
+						<div class="text-center">
+							<h3 class="text-[15px] font-bold text-foreground">Order Collected</h3>
+							<p class="mt-0.5 text-[10px] font-bold tracking-widest text-emerald-500 uppercase">
+								₹{appState.activeTicket.total} deducted from wallet
+							</p>
+						</div>
+					</div>
+				{:else if scanState === 'error'}
+					<div
+						class="flex flex-col items-center gap-3 rounded-[20px] border border-destructive/25 bg-destructive/5 p-4 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					>
+						<div class="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/20">
+							<X size={22} class="text-destructive" strokeWidth={2.5} />
+						</div>
+						<div class="text-center">
+							<h3 class="text-[15px] font-bold text-foreground">Scan Failed</h3>
+							<p class="mt-0.5 text-[10px] font-bold tracking-widest text-foreground/60 uppercase">
+								{manualError || 'Could not read the counter QR'}
+							</p>
+						</div>
+						<button
+							onclick={resetScan}
+							class="w-full rounded-full border border-muted/50 bg-card py-3 text-[12px] font-bold text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
+						>
+							Try Again
+						</button>
+					</div>
+				{/if}
 
-            {#if scanState !== 'success' && fallbackState !== 'confirmed'}
-                <div class="overflow-hidden border border-dashed border-border">
-                    {#if fallbackState === 'hidden'}
-                        <button onclick={openFallback} class="flex w-full items-center justify-between px-4 py-3.5 transition-colors hover:bg-muted/30">
-                            <div class="flex items-center gap-2.5"><Hash size={13} class="text-muted-foreground" /><span class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">Scanner not working?</span></div>
-                            <span class="font-mono text-[10px] tracking-wider text-foreground/40 uppercase">Manual entry →</span>
-                        </button>
-                    {:else if fallbackState === 'open'}
-                        <div class="space-y-3 px-4 py-4">
-                            <div class="flex items-center justify-between">
-                                <span class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">Manual Confirmation</span>
-                                <button onclick={closeFallback} class="text-muted-foreground hover:text-foreground"><X size={13} /></button>
-                            </div>
-                            <p class="text-xs leading-relaxed font-light text-muted-foreground">Tell the counter staff your order number. They will enter it on their terminal to confirm your order.</p>
-                            <div class="border border-border bg-background px-4 py-3 text-center">
-                                <p class="mb-1 font-mono text-[10px] tracking-widest text-muted-foreground uppercase">Your Order ID</p>
-                                <p class="font-mono text-2xl font-medium tracking-wider text-foreground">{appState.activeTicket.id}</p>
-                            </div>
-                            <div class="h-px bg-border"></div>
-                            <div class="space-y-2">
-                                <p class="block font-mono text-[10px] tracking-widest text-muted-foreground uppercase">Staff: enter order ID to confirm</p>
-                                <input type="text" bind:value={manualOrderId} placeholder={appState.activeTicket.id} class="w-full border border-border bg-background px-3 py-2.5 font-mono text-sm tracking-wider text-foreground uppercase transition-colors outline-none placeholder:text-muted-foreground/30 focus:border-foreground/40" oninput={() => (manualError = '')} />
-                                {#if manualError}<p class="font-mono text-[10px] tracking-wider text-destructive uppercase">{manualError}</p>{/if}
-                            </div>
-                            <button onclick={submitManual} class="w-full bg-foreground py-3 text-xs font-medium tracking-wide text-background transition-all active:scale-[0.98]">Confirm Order</button>
-                        </div>
-                    {:else if fallbackState === 'submitting'}
-                        <div class="flex items-center justify-center gap-3 px-4 py-4">
-                            <div class="h-4 w-4 animate-spin border border-foreground/30 border-t-foreground"></div>
-                            <span class="font-mono text-[11px] tracking-widest text-muted-foreground uppercase">Confirming…</span>
-                        </div>
-                    {:else if fallbackState === 'confirmed'}
-                        <div class="flex items-center justify-center gap-2 px-4 py-4">
-                            <CheckCircle size={14} class="text-emerald-400" /><span class="font-mono text-[11px] tracking-widest text-emerald-400 uppercase">Confirmed by staff</span>
-                        </div>
-                    {/if}
-                </div>
-            {/if}
+				{#if scanState !== 'success' && fallbackState !== 'confirmed'}
+					<div
+						class="overflow-hidden rounded-[20px] border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					>
+						{#if fallbackState === 'hidden'}
+							<button
+								onclick={openFallback}
+								class="flex w-full items-center justify-between px-4 py-3 transition-colors active:bg-muted/30"
+							>
+								<div class="flex items-center gap-2">
+									<Hash size={14} strokeWidth={2.5} class="text-foreground/40" />
+									<span class="text-[10px] font-bold tracking-widest text-foreground/60 uppercase">
+										Scanner not working?
+									</span>
+								</div>
+								<span class="text-[10px] font-bold tracking-widest text-primary uppercase">
+									Manual entry →
+								</span>
+							</button>
+						{:else if fallbackState === 'open'}
+							<div class="space-y-3 px-4 py-4">
+								<div class="flex items-center justify-between">
+									<span class="text-[10px] font-bold tracking-widest text-foreground/60 uppercase">
+										Manual Confirmation
+									</span>
+									<button
+										onclick={closeFallback}
+										class="flex h-7 w-7 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
+									>
+										<X size={13} strokeWidth={2.5} />
+									</button>
+								</div>
+								<p class="text-[12px] leading-relaxed font-medium text-foreground/60">
+									Tell the counter staff your order number. They will enter it on their terminal to
+									confirm your order.
+								</p>
+								<div class="rounded-[14px] bg-muted/20 px-3 py-3 text-center">
+									<p
+										class="mb-0.5 text-[9px] font-bold tracking-[0.15em] text-foreground/50 uppercase"
+									>
+										Your Order ID
+									</p>
+									<p class="text-[22px] font-black tracking-widest text-foreground uppercase">
+										{appState.activeTicket.id}
+									</p>
+								</div>
+								<div class="h-px bg-muted/20"></div>
+								<div class="space-y-1.5">
+									<p
+										class="block text-[9px] font-bold tracking-widest text-foreground/60 uppercase"
+									>
+										Staff: enter order ID to confirm
+									</p>
+									<input
+										type="text"
+										bind:value={manualOrderId}
+										placeholder={appState.activeTicket.id}
+										class="w-full rounded-xl border border-muted/40 bg-card px-3 py-2.5 text-[13px] font-bold tracking-wider text-foreground uppercase transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/50"
+										oninput={() => (manualError = '')}
+									/>
+									{#if manualError}
+										<p class="text-[10px] font-bold tracking-widest text-destructive uppercase">
+											{manualError}
+										</p>
+									{/if}
+								</div>
+								<button
+									onclick={submitManual}
+									class="mt-1 w-full rounded-full bg-primary py-3 text-[12px] font-bold text-background transition-all active:scale-[0.98]"
+								>
+									Confirm Order
+								</button>
+							</div>
+						{:else if fallbackState === 'submitting'}
+							<div class="flex items-center justify-center gap-2.5 px-4 py-4">
+								<Loader2 size={14} strokeWidth={2.5} class="animate-spin text-foreground/50" />
+								<span class="text-[10px] font-bold tracking-widest text-foreground/60 uppercase">
+									Confirming…
+								</span>
+							</div>
+						{:else if fallbackState === 'confirmed'}
+							<div class="flex items-center justify-center gap-2 bg-emerald-500/10 px-4 py-4">
+								<CheckCircle size={14} strokeWidth={2.5} class="text-emerald-500" />
+								<span class="text-[10px] font-bold tracking-widest text-emerald-500 uppercase">
+									Confirmed by staff
+								</span>
+							</div>
+						{/if}
+					</div>
+				{/if}
 
-            <div class="overflow-hidden border border-border bg-card">
-                <div class="flex items-center justify-between border-b border-border px-5 py-3">
-                    <span class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">Receipt</span>
-                    <span class="font-mono text-[10px] text-muted-foreground">{appState.activeTicket.id}</span>
-                </div>
-                <div class="space-y-3 px-5 py-4">
-                    {#each appState.activeTicket.items as item (item.menuItem.id)}
-                        <div class="flex items-start justify-between">
-                            <div class="flex items-start gap-3">
-                                <span class="w-6 shrink-0 pt-px text-right font-mono text-[11px] text-muted-foreground">{item.quantity}×</span>
-                                <div>
-                                    <span class="text-sm font-medium text-foreground">{item.menuItem.name}</span>
-                                    <p class="mt-0.5 font-mono text-[10px] tracking-wider text-muted-foreground uppercase">{item.menuItem.category}</p>
-                                </div>
-                            </div>
-                            <span class="font-mono text-sm text-foreground">₹{item.menuItem.price * item.quantity}</span>
-                        </div>
-                    {/each}
-                </div>
-                <div class="mx-5 border-t border-dashed border-border"></div>
-                <div class="flex items-center justify-between px-5 py-4">
-                    <span class="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">Due on Collection</span>
-                    <span class="font-mono text-xl font-medium text-foreground">₹{appState.activeTicket.total}</span>
-                </div>
-            </div>
-        </div>
-    {:else}
-        <div class="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
-            <div class="flex h-16 w-16 items-center justify-center border border-border"><QrCode size={28} class="text-muted-foreground" strokeWidth={1} /></div>
-            <div>
-                <h3 class="text-base font-medium text-foreground">No Active Orders</h3>
-                <p class="mt-1 text-sm leading-relaxed font-light text-muted-foreground">Place an order from the menu to generate a ticket.</p>
-            </div>
-        </div>
-    {/if}
-    </div>
+				<div
+					class="overflow-hidden rounded-[20px] border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+				>
+					<div
+						class="flex items-center justify-between border-b border-muted/20 bg-muted/10 px-4 py-2.5"
+					>
+						<span class="text-[9px] font-bold tracking-[0.15em] text-foreground/50 uppercase">
+							Receipt
+						</span>
+						<span class="text-[11px] font-bold text-foreground/50">{appState.activeTicket.id}</span>
+					</div>
+					<div class="divide-y divide-muted/20 px-4">
+						{#each appState.activeTicket.items as item (item.menuItem.id)}
+							<div class="flex items-center justify-between py-2.5">
+								<div class="flex items-center gap-2.5">
+									<span
+										class="flex h-5 w-5 items-center justify-center rounded-md bg-muted text-[11px] font-bold text-foreground/70"
+									>
+										{item.quantity}
+									</span>
+									<div class="flex flex-col">
+										<span class="text-[13px] font-semibold text-foreground">
+											{item.menuItem.name}
+										</span>
+										<span class="text-[9px] font-bold tracking-widest text-foreground/50 uppercase">
+											{item.menuItem.category}
+										</span>
+									</div>
+								</div>
+								<span class="text-[13px] font-bold text-foreground">
+									₹{item.menuItem.price * item.quantity}
+								</span>
+							</div>
+						{/each}
+					</div>
+					<div
+						class="flex items-center justify-between border-t border-muted/20 bg-muted/20 px-4 py-3"
+					>
+						<span class="text-[11px] font-bold text-foreground/60">Due on collection</span>
+						<span class="text-[16px] font-bold text-foreground">₹{appState.activeTicket.total}</span
+						>
+					</div>
+				</div>
+			</div>
+		{:else}
+			<div
+				class="mt-6 flex flex-1 flex-col items-center justify-center gap-3 rounded-3xl border border-muted/25 bg-card p-8 text-center shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+			>
+				<div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
+					<QrCode size={24} strokeWidth={2} class="text-foreground/50" />
+				</div>
+				<div>
+					<h3 class="text-[16px] font-bold text-foreground">No Active Orders</h3>
+					<p class="mt-1 text-[13px] font-medium text-foreground/50">
+						Place an order from the menu to generate a ticket.
+					</p>
+				</div>
+				<a
+					href={resolve('/menu')}
+					class="mt-1 rounded-full bg-primary px-5 py-2.5 text-[12px] font-bold text-background transition-all active:scale-95"
+				>
+					Browse Menu
+				</a>
+			</div>
+		{/if}
+	</div>
 </div>
-
-<style>
-    @keyframes scan {
-        0% { top: 0.75rem; }
-        50% { top: calc(100% - 0.75rem); }
-        100% { top: 0.75rem; }
-    }
-</style>
