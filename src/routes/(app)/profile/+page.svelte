@@ -350,13 +350,28 @@
 					<LogOut size={14} strokeWidth={2.5} /> Sign Out
 				</button>
 
-				<div class="flex items-center justify-between px-2 pb-6">
-					<span class="text-[10px] font-bold tracking-widest text-foreground/40 uppercase"
-						>MunchUp v1.0.0</span
+				<div class="px-2 pb-6">
+					<div
+						class="flex items-center justify-between rounded-xl border border-border/50 bg-muted/30 px-3 py-3"
 					>
-					<span class="text-[10px] font-bold tracking-widest text-foreground/40 uppercase"
-						>Shivamogga</span
-					>
+						<div class="flex w-full flex-col">
+							<p
+								class="flex w-full justify-between text-[10px] font-bold tracking-widest text-foreground/40 uppercase"
+							>
+								<span>
+									&copy; MunchUp - {new Date().getFullYear()}
+								</span>
+								<span> Basavanagudi </span>
+							</p>
+						</div>
+					</div>
+
+					<p class="mt-6 text-center text-xs text-foreground/60">
+						Built by
+						<a href="https://github.com/imvbhargav" target="_blank" rel="noopener noreferrer">
+							@imvbhargav
+						</a>
+					</p>
 				</div>
 			</div>
 		</div>

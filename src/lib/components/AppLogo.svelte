@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="70 50 360 370" class="h-full w-full">
+<div class="flex items-center gap-2">
+	<div class="flex h-10 w-10 items-center justify-center">
+		<svg xmlns="http://www.w3.org/2000/svg" viewBox="70 50 360 370" class="h-full w-full">
 			<defs>
 				<linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
 					<stop offset="0%" stop-color="#1b365d" />
@@ -41,3 +43,11 @@
 				<circle cx="300" cy="245" r="6" fill="url(#accentGradient)" />
 			</g>
 		</svg>
+	</div>
+	<p>
+		<span
+			class="to accent bg-linear-to-r from-accent to-primary to-50% bg-clip-text font-site-name text-2xl font-black tracking-tight text-transparent"
+			>MunchUp</span
+		>
+	</p>
+</div>

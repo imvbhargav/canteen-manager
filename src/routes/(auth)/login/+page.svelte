@@ -3,14 +3,17 @@
 		ArrowRight,
 		Loader2,
 		Fingerprint,
-		ChevronLeft,
 		ChevronRight,
-		UserPlus
+		UserPlus,
+		User,
+		ArrowRightLeft,
+		Users
 	} from 'lucide-svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+	import AppLogo from '$lib/components/AppLogo.svelte';
 
 	interface SavedProfile {
 		identifier: string;
@@ -197,7 +200,7 @@
 	{:else if currentScreen === 'profiles'}
 		<div class="flex flex-1 flex-col px-5">
 			<div class="mt-2">
-				<h1 class="text-[32px] font-black tracking-tight text-primary">MunchUp</h1>
+				<AppLogo />
 				<p class="text-[13px] font-medium text-foreground/50">Welcome back. Choose an account.</p>
 			</div>
 
@@ -249,30 +252,87 @@
 
 		<!-- ── Screen: PIN Entry (selected profile) ── -->
 	{:else if currentScreen === 'pin'}
-		<div class="flex flex-1 flex-col px-5 pt-4">
-			<div class="flex items-center gap-3">
-				<button
-					onclick={goBack}
-					class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
-				>
-					<ChevronLeft size={18} strokeWidth={2.5} />
-				</button>
-				<h1 class="text-[20px] font-bold tracking-tight text-foreground">MunchUp</h1>
+		<div class="flex flex-1 flex-col px-5 pt-2">
+			<div>
+				<AppLogo />
+				<p class="text-[13px] font-medium text-foreground/50">Enter your pin to login.</p>
 			</div>
 
-			<div class="mt-12 flex flex-col items-center">
-				<div
-					class="flex h-16 w-16 items-center justify-center rounded-full bg-muted/50 text-[24px] font-black text-foreground/60"
-				>
-					{selectedProfile!.name?.charAt(0).toUpperCase()}
+			<div class="mt-12 rounded-2xl bg-linear-to-b from-primary/75 to-transparent p-2">
+				<div class="flex items-center justify-between px-2">
+					<div class="flex items-center gap-2 rounded-t-2xl px-4 pt-4 pb-8">
+						<div
+							class="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-[24px] font-black text-primary"
+						>
+							<User class="h-4 w-4" />
+						</div>
+						<div>
+							<p class="text-xs font-medium tracking-wide text-foreground/50 uppercase">
+								{selectedProfile!.identifier}
+							</p>
+							<p class="-mt-1 font-bold text-foreground">
+								{selectedProfile!.name || 'Unknown User'}
+							</p>
+						</div>
+					</div>
+					<button
+						onclick={goBack}
+						class="flex items-center gap-2 rounded-full border border-accent bg-accent/75 px-2 py-1 text-xs text-background"
+					>
+						<ArrowRightLeft class="h-4 w-4" />
+						<span> Change </span>
+					</button>
 				</div>
-				<p class="mt-3 text-[16px] font-bold text-foreground">
-					{selectedProfile!.name || 'Unknown User'}
-				</p>
-				<p class="mt-1 text-[11px] font-medium tracking-wide text-foreground/50 uppercase">
-					{selectedProfile!.identifier}
-				</p>
+
+				<div class="-mt-4 flex flex-col items-center rounded-2xl bg-background">
+					<button
+						type="button"
+						onclick={() => pinInputEl?.focus()}
+						class="relative cursor-pointer bg-transparent px-4 py-4 outline-none"
+					>
+						<div class="flex items-center justify-center gap-4">
+							{#each [0, 1, 2, 3] as i (i)}
+								<div
+									class="flex h-14 w-14 items-center justify-center rounded-2xl border-2 transition-all duration-150 {i <
+									pin.length
+										? 'scale-105 border-foreground bg-foreground'
+										: i === pin.length && !isLoading
+											? 'border-foreground/50 bg-muted/30'
+											: 'border-muted/40 bg-muted/20'}"
+								>
+									{#if i < pin.length}
+										<div class="h-3 w-3 rounded-full bg-background"></div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+						<input
+							bind:this={pinInputEl}
+							type="password"
+							inputmode="numeric"
+							maxlength="4"
+							bind:value={pin}
+							class="pointer-events-none absolute inset-0 cursor-default opacity-0"
+							autocomplete="current-password"
+						/>
+					</button>
+
+					<button
+						type="button"
+						class="my-8 flex items-center gap-2 rounded-full bg-accent/25 px-4 py-2 text-[12px] font-bold text-foreground/50 transition-colors active:text-foreground/80"
+					>
+						<Fingerprint size={15} strokeWidth={2.5} />
+						Use Biometrics
+					</button>
+				</div>
 			</div>
+
+			{#if isLoading}
+				<div class="mt-6 flex items-center justify-center gap-2">
+					<Loader2 size={14} class="animate-spin text-foreground/50" />
+					<span class="text-[11px] font-bold text-foreground/50">Authenticating...</span>
+				</div>
+			{/if}
 
 			{#if errorMsg}
 				<div
@@ -281,69 +341,14 @@
 					<p class="text-center text-[11px] font-bold text-destructive">{errorMsg}</p>
 				</div>
 			{/if}
-
-			<div class="mt-8 flex flex-col items-center">
-				<button
-					type="button"
-					onclick={() => pinInputEl?.focus()}
-					class="relative cursor-pointer bg-transparent px-4 py-4 outline-none"
-				>
-					<div class="flex items-center justify-center gap-4">
-						{#each [0, 1, 2, 3] as i (i)}
-							<div
-								class="flex h-14 w-14 items-center justify-center rounded-2xl border-2 transition-all duration-150 {i <
-								pin.length
-									? 'scale-105 border-foreground bg-foreground'
-									: i === pin.length && !isLoading
-										? 'border-foreground/50 bg-muted/30'
-										: 'border-muted/40 bg-muted/20'}"
-							>
-								{#if i < pin.length}
-									<div class="h-3 w-3 rounded-full bg-background"></div>
-								{/if}
-							</div>
-						{/each}
-					</div>
-					<input
-						bind:this={pinInputEl}
-						type="password"
-						inputmode="numeric"
-						maxlength="4"
-						bind:value={pin}
-						class="pointer-events-none absolute inset-0 cursor-default opacity-0"
-						autocomplete="current-password"
-					/>
-				</button>
-
-				{#if isLoading}
-					<div class="mt-6 flex items-center gap-2">
-						<Loader2 size={14} class="animate-spin text-foreground/50" />
-						<span class="text-[11px] font-bold text-foreground/50">Authenticating...</span>
-					</div>
-				{/if}
-
-				<button
-					type="button"
-					class="mt-8 flex items-center gap-2 text-[12px] font-bold text-foreground/50 transition-colors active:text-foreground/80"
-				>
-					<Fingerprint size={15} strokeWidth={2.5} />
-					Use Biometrics
-				</button>
-			</div>
 		</div>
 
 		<!-- ── Screen: Full Login Form ── -->
 	{:else}
-		<div class="flex flex-1 flex-col px-5 pt-4">
+		<div class="flex flex-1 flex-col px-5 pt-2">
 			<div class="flex items-center gap-3">
-				<button
-					onclick={goBack}
-					class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
-				>
-					<ChevronLeft size={16} strokeWidth={2.5} />
-				</button>
 				<div>
-					<h1 class="text-[20px] font-bold tracking-tight text-foreground">MunchUp</h1>
+					<AppLogo />
 					<p class="mt-0.5 text-[13px] font-medium text-foreground/50">
 						{isSwitching ? 'Sign in with a different account' : 'Sign in to continue'}
 					</p>
@@ -409,11 +414,12 @@
 				</button>
 
 				<button
+					onclick={goBack}
 					type="button"
 					class="flex w-full items-center justify-center gap-2.5 rounded-full border border-muted/30 bg-muted/20 py-3 text-[12px] font-bold text-foreground/70 transition-all active:scale-[0.98] active:bg-muted/40"
 				>
-					<Fingerprint size={15} strokeWidth={2.5} />
-					Use Biometrics
+					<Users size={15} strokeWidth={2.5} />
+					Use existing profiles
 				</button>
 			</form>
 

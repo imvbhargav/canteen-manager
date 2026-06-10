@@ -2,6 +2,7 @@
 	import { Wallet, CheckCircle2, Loader2, AlertCircle, LogOut } from 'lucide-svelte';
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
+	import AppLogo from '$lib/components/AppLogo.svelte';
 
 	let walletForm = $state({
 		identifier: '',
@@ -70,16 +71,13 @@
 
 <svelte:head><title>Fund Wallet | MunchUp Admin</title></svelte:head>
 
-<div class="animate-in fade-in min-h-full bg-background pb-6 duration-300">
-	<header class="flex h-16 shrink-0 items-center gap-3 px-5">
-		<div
-			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-foreground text-background"
-		>
-			<Wallet size={16} strokeWidth={2.5} />
+<div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
+	<header
+		class="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-3 bg-background/15 px-5 backdrop-blur-md"
+	>
+		<div>
+			<AppLogo />
 		</div>
-
-		<h2 class="flex-1 text-[20px] font-bold tracking-tight text-foreground">Fund Wallet</h2>
-
 		<div class="flex items-center justify-end gap-3">
 			<div
 				class="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-600"

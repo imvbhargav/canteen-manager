@@ -178,6 +178,11 @@
 			}
 		}
 	}
+
+	function cancelOrder(): void {
+		appState.activeTicket = null;
+		goto(resolve('/menu'));
+	}
 </script>
 
 <svelte:head><title>Your Ticket | MunchUp</title></svelte:head>
@@ -208,7 +213,7 @@
 		</div>
 	</header>
 
-	<div class="px-5 pt-1">
+	<div class="px-5 pt-1 pb-8">
 		{#if appState.activeTicket}
 			<div class="space-y-3">
 				{#if scanState === 'idle' || scanState === 'starting' || scanState === 'scanning'}
@@ -474,6 +479,15 @@
 						<span class="text-[16px] font-bold text-foreground">₹{appState.activeTicket.total}</span
 						>
 					</div>
+				</div>
+
+				<div class="pt-2">
+					<button
+						onclick={cancelOrder}
+						class="w-full rounded-full border border-destructive/25 bg-card py-3.5 text-[13px] font-bold text-destructive transition-all active:scale-[0.98]"
+					>
+						Cancel Order
+					</button>
 				</div>
 			</div>
 		{:else}

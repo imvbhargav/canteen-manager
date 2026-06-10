@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { ArrowLeft, QrCode, Download, Loader2 } from 'lucide-svelte';
+	import AppLogo from '$lib/components/AppLogo.svelte';
+	import { QrCode, Download, Loader2, LogOut } from 'lucide-svelte';
 
 	type CounterQR = {
 		id: string;
@@ -13,6 +15,7 @@
 	let counterList: CounterQR[] = $state([]);
 	let isLoading: boolean = $state(false);
 	let errorMessage: string = $state('');
+	let isLoggingOut: boolean = $state(false);
 
 	async function fetchCounterQRs(): Promise<void> {
 		isLoading = true;
@@ -43,20 +46,56 @@
 		downloadLink.click();
 		document.body.removeChild(downloadLink);
 	}
+
+	async function handleLogout(): Promise<void> {
+		if (isLoggingOut) return;
+		isLoggingOut = true;
+
+		try {
+			const res: Response = await fetch('/api/auth/logout', { method: 'POST' });
+			if (res.ok) {
+				goto(resolve('/login'));
+			} else {
+				console.error('Logout failed');
+				isLoggingOut = false;
+			}
+		} catch {
+			console.error('Network error during logout');
+			isLoggingOut = false;
+		}
+	}
 </script>
 
 <svelte:head><title>Counter QRs | MunchUp Admin</title></svelte:head>
 
-<div class="animate-in fade-in min-h-screen bg-background pb-6 duration-300">
-	<header class="flex h-16 shrink-0 items-center gap-3 px-5">
-		<a
-			href={resolve('/admin')}
-			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
-		>
-			<ArrowLeft size={18} strokeWidth={2.5} />
-		</a>
-		<h2 class="flex-1 text-[20px] font-bold tracking-tight text-foreground">Counter QRs</h2>
-		<div class="flex w-9"></div>
+<div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
+	<header
+		class="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-3 bg-background/15 px-5 backdrop-blur-md"
+	>
+		<div>
+			<AppLogo />
+		</div>
+		<div class="flex items-center justify-end gap-3">
+			<div
+				class="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-600"
+			>
+				<div class="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
+				<span class="text-[9px] font-bold tracking-widest uppercase">Online</span>
+			</div>
+
+			<button
+				onclick={handleLogout}
+				disabled={isLoggingOut}
+				class="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90 disabled:opacity-50"
+				title="Log Out"
+			>
+				{#if isLoggingOut}
+					<Loader2 size={16} strokeWidth={2.5} class="animate-spin" />
+				{:else}
+					<LogOut size={16} strokeWidth={2.5} />
+				{/if}
+			</button>
+		</div>
 	</header>
 
 	<div class="space-y-6 px-5 pt-4">

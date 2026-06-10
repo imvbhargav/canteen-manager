@@ -19,6 +19,7 @@
 	} from 'lucide-svelte';
 	import { resolve } from '$app/paths';
 	import type { MenuItem } from '$lib/types';
+	import AppLogo from '$lib/components/AppLogo.svelte';
 
 	type Transaction = {
 		id: string;
@@ -28,51 +29,58 @@
 		amount: number;
 	};
 
+	type CartItem = {
+		menuItem: MenuItem;
+		quantity: number;
+	};
+
+	type RawTransaction = {
+		id: string;
+		type: string;
+		description: string;
+		createdAt: string | Date;
+		amount: number | string;
+	};
+
 	let recentTransactions: Transaction[] = $state([]);
 	let isLoadingTransactions: boolean = $state(true);
 
 	$effect(() => {
 		isLoadingTransactions = true;
 		fetch('/api/wallet/history')
-			.then((res) => res.json())
-			.then((result) => {
+			.then((res: Response) => res.json())
+			.then((result: { success: boolean; data: RawTransaction[] }) => {
 				if (result.success) {
-					recentTransactions = result.data.map(
-						(tx: {
-							id: string;
-							type: string;
-							description: string;
-							createdAt: Date;
-							amount: number;
-						}) => {
-							const d = new Date(tx.createdAt);
-							const dateStr = d.toLocaleDateString(undefined, { weekday: 'short' });
-							const timeStr = d.toLocaleTimeString(undefined, {
-								hour: 'numeric',
-								minute: '2-digit'
-							});
-							return {
-								id: tx.id,
-								type: tx.type === 'CREDIT' ? 'credit' : 'debit',
-								title: tx.description,
-								date: `${dateStr} · ${timeStr}`,
-								amount: Number(tx.amount)
-							};
-						}
-					);
+					recentTransactions = result.data.map((tx: RawTransaction): Transaction => {
+						const d: Date = new Date(tx.createdAt);
+						const dateStr: string = d.toLocaleDateString(undefined, { weekday: 'short' });
+						const timeStr: string = d.toLocaleTimeString(undefined, {
+							hour: 'numeric',
+							minute: '2-digit'
+						});
+						return {
+							id: tx.id,
+							type: tx.type === 'CREDIT' ? 'credit' : 'debit',
+							title: tx.description,
+							date: `${dateStr} · ${timeStr}`,
+							amount: Number(tx.amount)
+						};
+					});
 				}
 			})
-			.catch((err) => console.error('Failed to fetch transactions:', err))
+			.catch((err: Error) => console.error('Failed to fetch transactions:', err))
 			.finally(() => (isLoadingTransactions = false));
 	});
 
-	function cancelOrder() {
+	function cancelOrder(): void {
 		appState.activeTicket = null;
 		goto(resolve('/menu'));
 	}
 
-	function addToCart(item: MenuItem) {
-		const existing = appState.cart.find((c) => c.menuItem.id === item.id);
+	function addToCart(item: MenuItem): void {
+		const existing: CartItem | undefined = appState.cart.find(
+			(c: CartItem) => c.menuItem.id === item.id
+		);
 		if (existing) {
 			existing.quantity += 1;
 		} else {
@@ -80,8 +88,8 @@
 		}
 	}
 
-	function removeFromCart(item: MenuItem) {
-		const index = appState.cart.findIndex((c) => c.menuItem.id === item.id);
+	function removeFromCart(item: MenuItem): void {
+		const index: number = appState.cart.findIndex((c: CartItem) => c.menuItem.id === item.id);
 		if (index !== -1) {
 			if (appState.cart[index].quantity > 1) {
 				appState.cart[index].quantity -= 1;
@@ -91,11 +99,11 @@
 		}
 	}
 
-	function getQty(id: string) {
-		return appState.cart.find((c) => c.menuItem.id === id)?.quantity ?? 0;
+	function getQty(id: string): number {
+		return appState.cart.find((c: CartItem) => c.menuItem.id === id)?.quantity ?? 0;
 	}
 
-	const categoryOrder = ['Breakfast', 'Lunch', 'Snacks', 'Beverages'];
+	const categoryOrder: string[] = ['Breakfast', 'Lunch', 'Snacks', 'Beverages'];
 	const categoryIcons: Record<string, typeof Sunrise> = {
 		Breakfast: Sunrise,
 		Lunch: Sandwich,
@@ -103,38 +111,56 @@
 		Beverages: Coffee
 	};
 
-	let activeCategory = $state('Breakfast');
+	let activeCategory: string = $state('Breakfast');
 
-	let summaryItems = $derived(() =>
-		appState.menuItems.filter((item) => item.category === activeCategory).slice(0, 4)
+	let summaryItems: MenuItem[] = $derived(
+		appState.menuItems.filter((item: MenuItem) => item.category === activeCategory).slice(0, 4)
 	);
 
-	let availableCategories = $derived(() =>
-		categoryOrder.filter((cat) => appState.menuItems.some((item) => item.category === cat))
+	let availableCategories: string[] = $derived(
+		categoryOrder.filter((cat: string) =>
+			appState.menuItems.some((item: MenuItem) => item.category === cat)
+		)
+	);
+
+	let cartTotalQty: number = $derived(
+		appState.cart.reduce((acc: number, curr: CartItem) => acc + curr.quantity, 0)
+	);
+
+	let cartTotalPrice: number = $derived(
+		appState.cart.reduce(
+			(acc: number, curr: CartItem) => acc + curr.menuItem.price * curr.quantity,
+			0
+		)
 	);
 
 	$effect(() => {
-		const avail = availableCategories();
-		if (avail.length > 0 && !avail.includes(activeCategory)) {
-			activeCategory = avail[0];
+		if (availableCategories.length > 0 && !availableCategories.includes(activeCategory)) {
+			activeCategory = availableCategories[0];
 		}
 	});
+
+	function handleCheckout(): void {
+		if (!appState.wallet || appState.wallet.balance < cartTotalPrice) return;
+
+		appState.activeTicket = {
+			id: 'NEX-' + Math.floor(10000 + Math.random() * 90000).toString(),
+			items: [...appState.cart],
+			total: cartTotalPrice,
+			timestamp: new Date(),
+			status: 'PENDING'
+		};
+		appState.cart = [];
+		goto(resolve('/ticket'));
+	}
 </script>
 
 <svelte:head><title>Dashboard | MunchUp</title></svelte:head>
 
 {#if appState.wallet}
 	<div class="animate-in fade-in min-h-screen bg-background pb-28 duration-300">
-		<!-- ━━ Header: branding + bell ━━ -->
 		<div class="flex items-center justify-between px-5 pt-6 pb-0">
-			<div class="flex items-center gap-2">
-				<div
-					class="flex h-8 w-8 items-center justify-center rounded-[10px] bg-primary text-background"
-				>
-					<UtensilsCrossed size={16} strokeWidth={2.5} />
-				</div>
-				<span class="text-[22px] font-black tracking-tight text-accent">MunchUp</span>
-			</div>
+			<AppLogo />
 			<button
 				class="relative flex h-10 w-10 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
 			>
@@ -145,7 +171,6 @@
 			</button>
 		</div>
 
-		<!-- ━━ Welcome + Dynamic Section (Menu or Active Ticket) ━━ -->
 		<div class="px-5 pt-5">
 			<h1 class="text-[26px] font-bold tracking-tight text-foreground">
 				Hi, {appState.wallet.name.split(' ')[0]} 👋
@@ -154,7 +179,6 @@
 			{#if appState.activeTicket}
 				<p class="mt-1 text-[15px] font-medium text-foreground/45">Here is your pending order.</p>
 
-				<!-- ━━ Active ticket ━━ -->
 				<div
 					class="mt-4 overflow-hidden rounded-3xl border border-muted/30 bg-card shadow-[0_2px_16px_rgb(0,0,0,0.05)]"
 				>
@@ -215,18 +239,15 @@
 					</div>
 				</div>
 			{:else}
-				<p class="mt-1 text-[15px] font-medium text-foreground/45">
-					What are you craving for today?
-				</p>
+				<p class="text-sm font-medium text-foreground/45">What are you craving for today?</p>
 
-				<!-- Category tabs -->
-				<div class="mt-4 flex scrollbar-none gap-2 overflow-x-auto">
-					{#each availableCategories() as cat (cat)}
+				<div class="mt-6 flex scrollbar-none gap-2 overflow-x-auto">
+					{#each availableCategories as cat (cat)}
 						{@const Icon = categoryIcons[cat] ?? UtensilsCrossed}
 						<button
 							onclick={() => (activeCategory = cat)}
-							class="flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-all duration-200 active:scale-95
-                            {activeCategory === cat
+							class="flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-all duration-200 active:scale-95 {activeCategory ===
+							cat
 								? 'bg-primary text-background shadow-sm'
 								: 'bg-muted/50 text-foreground/50 hover:bg-muted hover:text-foreground'}"
 						>
@@ -236,21 +257,19 @@
 					{/each}
 				</div>
 
-				<!-- Menu items -->
 				<div class="mt-3">
-					{#if summaryItems().length > 0}
-						<div
-							class="overflow-hidden rounded-[22px] border border-muted/25 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
-						>
-							{#each summaryItems() as item, i (item.id)}
-								{@const qty = getQty(item.id)}
-								<div
-									class="flex items-center gap-3 px-4 py-3.5 {i < summaryItems().length - 1
-										? 'border-b border-muted/20'
-										: ''}"
-								>
+					<div
+						class="overflow-hidden rounded-[22px] border border-muted/25 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					>
+						{#each [0, 1, 2, 3] as i (i)}
+							<div
+								class="flex h-19 items-center gap-3 px-4 {i < 3 ? 'border-b border-muted/20' : ''}"
+							>
+								{#if summaryItems[i]}
+									{@const item = summaryItems[i]}
+									{@const qty = getQty(item.id)}
 									<div
-										class="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center self-start rounded-sm border-2 {item.dietary ===
+										class="flex h-3.5 w-3.5 shrink-0 items-center justify-center self-center rounded-sm border-2 {item.dietary ===
 										'veg'
 											? 'border-emerald-500'
 											: 'border-red-500'}"
@@ -291,46 +310,63 @@
 											<Plus size={16} strokeWidth={2.5} />
 										</button>
 									{/if}
+								{/if}
+							</div>
+						{/each}
+
+						<div class="border-t border-muted/20 bg-muted/5 p-3">
+							{#if (appState.wallet?.balance || 0) < cartTotalPrice && cartTotalQty > 0}
+								<div class="mb-2 flex items-center justify-between px-1">
+									<span class="text-[11px] font-bold tracking-wide text-foreground/40 uppercase"
+										>Total: ₹{cartTotalPrice.toFixed(2)}</span
+									>
+									<span class="text-[12px] font-semibold text-destructive"
+										>Insufficient Balance</span
+									>
 								</div>
-							{/each}
+							{/if}
+							<button
+								disabled={cartTotalQty === 0 || (appState.wallet?.balance || 0) < cartTotalPrice}
+								onclick={handleCheckout}
+								class="flex w-full items-center justify-between rounded-xl px-4 py-3 text-[14px] font-bold transition-all active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 {(appState
+									.wallet?.balance || 0) < cartTotalPrice && cartTotalQty > 0
+									? 'bg-muted text-foreground/40'
+									: 'bg-primary text-background'}"
+							>
+								<span class="flex items-center gap-2">
+									Checkout
+									{#if cartTotalQty > 0 && (appState.wallet?.balance || 0) >= cartTotalPrice}
+										<span class="rounded-full bg-background/20 px-2 py-0.5 text-[11px]"
+											>{cartTotalQty}</span
+										>
+									{/if}
+								</span>
+								<span class="flex items-center gap-1">
+									₹{cartTotalPrice.toFixed(2)}
+									<ChevronRight size={16} strokeWidth={2.5} />
+								</span>
+							</button>
 						</div>
-					{:else}
-						<div class="rounded-[22px] border border-muted/25 bg-card px-4 py-8 text-center">
-							<p class="text-[13px] text-foreground/40">Nothing available right now.</p>
-						</div>
-					{/if}
+					</div>
 				</div>
 
-				<!-- ━━ Lava-lamp CTA ━━ -->
 				<a
 					href={resolve('/menu')}
-					class="group relative mt-4 block overflow-hidden rounded-3xl bg-[#0f2544] px-6
-                           py-7 shadow-[0_8px_32px_rgba(15,37,68,0.35)]
-                           transition-transform duration-300 active:scale-[0.98]"
+					class="group relative mt-4 block overflow-hidden rounded-3xl bg-[#0f2544] px-6 py-7 shadow-[0_8px_32px_rgba(15,37,68,0.35)] transition-transform duration-300 active:scale-[0.98]"
 				>
-					<!-- Lava blobs... -->
 					<div
-						class="pointer-events-none absolute -top-10 -left-10 h-52 w-52 animate-pulse
-                                rounded-full bg-orange-500/40
-                                blur-3xl [animation-duration:3s]"
+						class="pointer-events-none absolute -top-10 -left-10 h-52 w-52 animate-pulse rounded-full bg-orange-500/40 blur-3xl [animation-duration:3s]"
 					></div>
 					<div
-						class="pointer-events-none absolute -right-8 -bottom-8 h-56 w-56 animate-pulse
-                                rounded-full bg-violet-600/35
-                                blur-3xl [animation-delay:1s] [animation-duration:4s]"
+						class="pointer-events-none absolute -right-8 -bottom-8 h-56 w-56 animate-pulse rounded-full bg-violet-600/35 blur-3xl [animation-delay:1s] [animation-duration:4s]"
 					></div>
 					<div
-						class="pointer-events-none absolute -bottom-12 left-1/2 h-40 w-40 -translate-x-1/2 animate-pulse
-                                rounded-full bg-rose-500/30
-                                blur-3xl [animation-delay:2s] [animation-duration:5s]"
+						class="pointer-events-none absolute -bottom-12 left-1/2 h-40 w-40 -translate-x-1/2 animate-pulse rounded-full bg-rose-500/30 blur-3xl [animation-delay:2s] [animation-duration:5s]"
 					></div>
 					<div
-						class="pointer-events-none absolute top-0 -right-4 h-32 w-32 animate-pulse
-                                rounded-full bg-emerald-400/20
-                                blur-2xl [animation-delay:0.5s] [animation-duration:3.5s]"
+						class="pointer-events-none absolute top-0 -right-4 h-32 w-32 animate-pulse rounded-full bg-emerald-400/20 blur-2xl [animation-delay:0.5s] [animation-duration:3.5s]"
 					></div>
 
-					<!-- Content -->
 					<div class="relative z-10">
 						<p class="text-[11px] font-bold tracking-[0.14em] text-white/40 uppercase">Full Menu</p>
 						<h2 class="mt-2 text-[26px] leading-tight font-black tracking-tight text-white">
@@ -340,16 +376,8 @@
 							Browse everything on today's canteen menu<br />and add to your cart in seconds.
 						</p>
 
-						<!-- Button with hover -->
 						<div
-							class="mt-5 inline-flex items-center gap-2 rounded-full
-                                    border border-white/15 bg-white/12
-                                    px-5 py-2.5 text-[13px]
-                                    font-bold text-white
-                                    backdrop-blur-sm
-                                    transition-all duration-200
-                                    group-hover:gap-3 group-hover:border-white/25 group-hover:bg-white/20
-                                    group-active:scale-95"
+							class="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/12 px-5 py-2.5 text-[13px] font-bold text-white backdrop-blur-sm transition-all duration-200 group-hover:gap-3 group-hover:border-white/25 group-hover:bg-white/20 group-active:scale-95"
 						>
 							Browse the menu
 							<ArrowRight
@@ -364,7 +392,6 @@
 		</div>
 
 		<div class="mt-6 space-y-6 px-5">
-			<!-- ━━ Wallet card ━━ -->
 			<div
 				class="relative overflow-hidden rounded-[28px] bg-linear-to-br from-primary to-accent px-6 py-5 shadow-[0_4px_24px_rgba(15,37,68,0.18)]"
 			>
@@ -397,7 +424,6 @@
 				</div>
 			</div>
 
-			<!-- ━━ Recent activity ━━ -->
 			<div>
 				<div class="mb-3 flex items-center justify-between">
 					<h3 class="text-[17px] font-bold text-foreground">Recent Activity</h3>
