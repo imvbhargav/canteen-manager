@@ -1,19 +1,18 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { formatCurrencyINR } from '$lib';
 	import { appState } from '$lib/store.svelte';
 	import {
 		LogOut,
 		ChevronRight,
 		History,
-		CreditCard,
 		Wallet,
 		ArrowLeft,
 		Download,
 		CheckCircle,
 		KeyRound,
-		Fingerprint,
-		Users,
-		Laptop
+		Laptop,
+		CreditCard
 	} from 'lucide-svelte';
 
 	interface BeforeInstallPromptEvent extends Event {
@@ -27,7 +26,6 @@
 
 	let deferredPrompt: BeforeInstallPromptEvent | null = $state(null);
 	let isInstalled: boolean = $state(true);
-	let biometricsEnabled: boolean = $state(true);
 
 	$effect((): (() => void) => {
 		isInstalled =
@@ -75,12 +73,8 @@
 		window.location.href = '/login';
 	}
 
-	async function switchProfile(): Promise<void> {
-		window.location.href = '/login?action=switch';
-	}
-
 	async function logoutAllDevices(): Promise<void> {
-		await fetch('/api/auth/logout-all', { method: 'POST' });
+		await fetch('/api/auth/logout-devices', { method: 'POST' });
 		window.location.href = '/login';
 	}
 </script>
@@ -107,57 +101,64 @@
 
 	{#if appState.wallet}
 		<div class="space-y-4 px-5 pt-1">
-			<!-- User Info Card -->
-			<div
-				class="flex items-center gap-4 rounded-[20px] border border-muted/30 bg-card p-4 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
-			>
+			<div class="rounded-4xl bg-primary p-1">
+				<!-- User Info Card -->
 				<div
-					class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-muted/50 text-[20px] font-black text-foreground/60"
+					class="flex items-center gap-4 rounded-t-4xl border border-muted/30 bg-card p-4 pb-10 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
 				>
-					{appState.wallet.name.charAt(0)}
-				</div>
-				<div class="min-w-0 flex-1">
-					<h3 class="truncate text-[16px] font-bold text-foreground">
-						{appState.wallet.name}
-					</h3>
-					<div class="mt-1 flex items-center gap-2">
-						<span
-							class="rounded-md bg-muted/50 px-2 py-0.5 text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
-						>
-							{appState.wallet.studentId}
-						</span>
-						<span
-							class="rounded-md bg-muted/50 px-2 py-0.5 text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
-						>
-							Roll {appState.wallet.rollNumber}
-						</span>
+					<div
+						class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-muted/50 text-[20px] font-black text-foreground/60"
+					>
+						{appState.wallet.name.charAt(0)}
 					</div>
-				</div>
-			</div>
-
-			<!-- Wallet Card -->
-			<div
-				class="relative overflow-hidden rounded-3xl bg-accent bg-linear-to-br from-primary/40 via-accent to-primary/25 px-5 py-5 shadow-[0_4px_24px_rgba(15,37,68,0.18)]"
-			>
-				<div class="relative">
-					<div class="flex items-center gap-2">
-						<Wallet size={13} strokeWidth={2.5} class="text-white/40" />
-						<span class="text-[10px] font-bold tracking-[0.15em] text-white/40 uppercase"
-							>Campus Wallet</span
-						>
-					</div>
-					<div class="mt-2 flex items-end justify-between">
-						<div>
-							<span class="text-[32px] font-bold tracking-tight text-white"
-								>₹{appState.wallet.balance.toFixed(2)}</span
+					<div class="min-w-0 flex-1">
+						<h3 class="truncate text-[16px] font-bold text-foreground">
+							{appState.wallet.name}
+						</h3>
+						<div class="mt-1 flex items-center gap-2">
+							<span
+								class="rounded-md bg-muted/50 px-2 py-0.5 text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
 							>
+								{appState.wallet.studentId}
+							</span>
+							<span
+								class="rounded-md bg-muted/50 px-2 py-0.5 text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
+							>
+								{appState.wallet.rollNumber}
+							</span>
 						</div>
-						<a
-							href={resolve('/topup')}
-							class="mb-1 flex items-center gap-1.5 rounded-full border border-white/25 bg-white/15 px-4 py-1.5 text-sm font-black text-white backdrop-blur-sm transition-all hover:border-primary/50 hover:bg-primary/25 active:scale-95 active:bg-white/20"
-						>
-							<CreditCard size={14} strokeWidth={2.5} /> Top Up
-						</a>
+					</div>
+				</div>
+
+				<!-- Wallet Card -->
+				<div
+					class="relative -mt-6 overflow-hidden rounded-[28px] bg-linear-to-br from-primary to-accent px-6 py-5 shadow-[0_4px_24px_rgba(15,37,68,0.18)]"
+				>
+					<div
+						class="pointer-events-none absolute -top-8 -right-8 h-36 w-36 rounded-full bg-white/5"
+					></div>
+					<div
+						class="pointer-events-none absolute -right-2 -bottom-6 h-28 w-28 rounded-full bg-white/2.5"
+					></div>
+					<div class="relative flex flex-col gap-6">
+						<div class="flex items-center gap-2">
+							<Wallet size={13} strokeWidth={2} class="text-background" />
+							<p class="text-xs font-black tracking-[0.15em] text-background uppercase">
+								Wallet Balance
+							</p>
+						</div>
+						<div class="flex items-end justify-between">
+							<p class="mt-1.5 font-mono text-2xl font-bold tracking-tight text-white">
+								{formatCurrencyINR(appState.wallet.balance)}
+							</p>
+							<a
+								href={resolve('/topup')}
+								class="flex items-center gap-1.5 rounded-full bg-background/80 px-4 py-2 text-sm font-black text-accent ring-4 ring-accent/25 backdrop-blur-md transition-all active:scale-95"
+							>
+								<CreditCard class="h-4 w-4" />
+								Top Up
+							</a>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -214,37 +215,6 @@
 							<ChevronRight size={16} strokeWidth={2.5} class="text-foreground/30" />
 						</a>
 
-						<!-- Biometrics Toggle -->
-						<button
-							onclick={() => (biometricsEnabled = !biometricsEnabled)}
-							class="flex w-full items-center justify-between px-4 py-4 transition-colors active:bg-muted/30"
-						>
-							<div class="flex items-center gap-3.5 text-left">
-								<div
-									class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/40"
-								>
-									<Fingerprint size={16} strokeWidth={2.5} class="text-foreground/70" />
-								</div>
-								<div>
-									<span class="block text-[14px] font-bold text-foreground">Biometric Login</span>
-									<span class="mt-0.5 block text-[11px] font-medium text-foreground/50"
-										>Use fingerprint or Face ID</span
-									>
-								</div>
-							</div>
-							<div
-								class="relative h-6 w-10 shrink-0 rounded-full transition-colors duration-200 ease-in-out {biometricsEnabled
-									? 'bg-emerald-500'
-									: 'bg-muted/80'}"
-							>
-								<div
-									class="absolute top-1 left-1 h-4 w-4 rounded-full bg-white transition-transform duration-200 ease-in-out {biometricsEnabled
-										? 'translate-x-4 shadow-[0_2px_4px_rgba(0,0,0,0.2)]'
-										: 'translate-x-0'}"
-								></div>
-							</div>
-						</button>
-
 						<!-- PWA Install Status -->
 						{#if isInstalled}
 							<div class="flex items-center justify-between bg-muted/10 px-4 py-4">
@@ -296,27 +266,6 @@
 					class="overflow-hidden rounded-3xl border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
 				>
 					<div class="divide-y divide-muted/20">
-						<!-- Switch Profile -->
-						<button
-							onclick={switchProfile}
-							class="flex w-full items-center justify-between px-4 py-4 transition-colors active:bg-muted/30"
-						>
-							<div class="flex items-center gap-3.5 text-left">
-								<div
-									class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/40"
-								>
-									<Users size={16} strokeWidth={2.5} class="text-foreground/70" />
-								</div>
-								<div>
-									<span class="block text-[14px] font-bold text-foreground">Switch Profile</span>
-									<span class="mt-0.5 block text-[11px] font-medium text-foreground/50"
-										>Sign in with a different account</span
-									>
-								</div>
-							</div>
-							<ChevronRight size={16} strokeWidth={2.5} class="text-foreground/30" />
-						</button>
-
 						<!-- Logout of All Devices -->
 						<button
 							onclick={logoutAllDevices}

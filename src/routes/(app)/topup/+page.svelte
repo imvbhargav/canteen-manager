@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { formatCurrencyINR } from '$lib';
 	import { appState } from '$lib/store.svelte';
 	import { ArrowLeft, AlertCircle } from 'lucide-svelte';
 
@@ -35,8 +36,8 @@
 			<span class="text-[10px] font-bold tracking-[0.15em] text-foreground/50 uppercase">
 				Current Balance
 			</span>
-			<span class="text-[14px] font-bold text-foreground">
-				₹{appState.wallet?.balance.toFixed(2) || '0.00'}
+			<span class="font-mono text-[14px] font-bold text-foreground">
+				{formatCurrencyINR(appState.wallet?.balance ?? 0)}
 			</span>
 		</div>
 
@@ -64,7 +65,7 @@
 					bind:value={amount}
 					min="1"
 					max="10000"
-					class="w-40 border-b-2 border-foreground/10 bg-transparent pb-1 text-center text-[48px] font-black tracking-tight text-foreground transition-colors outline-none"
+					class="w-40 border-b-2 border-foreground/10 bg-transparent pb-1 text-center font-mono text-[48px] font-black tracking-tight text-foreground transition-colors outline-none"
 					placeholder="0"
 				/>
 			</div>
@@ -72,7 +73,7 @@
 				{#each presets as preset (preset)}
 					<button
 						disabled
-						class="rounded-full border border-muted/50 bg-card py-2.5 text-[13px] font-bold text-foreground/50"
+						class="rounded-full border border-muted/50 bg-card py-2.5 font-mono text-[13px] font-bold text-foreground/50"
 					>
 						₹{preset}
 					</button>
@@ -88,24 +89,24 @@
 					<span class="text-[10px] font-bold tracking-[0.15em] text-foreground/50 uppercase">
 						Current
 					</span>
-					<span class="text-[13px] font-bold text-foreground/60">
-						₹{appState.wallet?.balance.toFixed(2) || '0.00'}
+					<span class="font-mono text-[13px] font-bold text-foreground/60">
+						{formatCurrencyINR(appState.wallet?.balance ?? 0)}
 					</span>
 				</div>
 				<div class="flex items-center justify-between px-5 py-4">
 					<span class="text-[10px] font-bold tracking-[0.15em] text-foreground/50 uppercase">
 						Adding
 					</span>
-					<span class="text-[13px] font-bold text-emerald-500">
-						+₹{amount || 0}
+					<span class="font-mono text-[13px] font-bold text-emerald-500">
+						+{formatCurrencyINR(amount || 0)}
 					</span>
 				</div>
 				<div
 					class="flex items-center justify-between border-t border-muted/20 bg-muted/10 px-5 py-4"
 				>
 					<span class="text-[11px] font-bold text-foreground/60">New Balance</span>
-					<span class="text-[16px] font-bold text-foreground">
-						₹{newBalance.toFixed(2)}
+					<span class="font-mono text-[16px] font-bold text-foreground">
+						{formatCurrencyINR(newBalance)}
 					</span>
 				</div>
 			</div>

@@ -5,71 +5,63 @@
 		UtensilsCrossed,
 		Wallet,
 		QrCode,
-		Plus,
-		Minus,
-		ArrowUpRight,
-		ArrowDownLeft,
-		Bell,
 		ChevronRight,
+		ArrowRight,
 		Sunrise,
 		Coffee,
 		Pizza,
 		Sandwich,
-		ArrowRight
+		User,
+		Clock,
+		Utensils,
+		CheckCircle2,
+		XCircle,
+		ReceiptText
 	} from 'lucide-svelte';
 	import { resolve } from '$app/paths';
 	import type { MenuItem } from '$lib/types';
 	import AppLogo from '$lib/components/AppLogo.svelte';
+	import { formatCurrencyINR } from '$lib';
 
-	type Transaction = {
+	type TicketItem = {
 		id: string;
-		type: 'credit' | 'debit';
-		title: string;
-		date: string;
-		amount: number;
-	};
-
-	type CartItem = {
-		menuItem: MenuItem;
 		quantity: number;
+		unitPrice: string;
+		menuItem: MenuItem;
 	};
 
-	type RawTransaction = {
+	type Ticket = {
 		id: string;
-		type: string;
-		description: string;
-		createdAt: string | Date;
-		amount: number | string;
+		ticketReference: string;
+		totalAmount: string;
+		status: 'PENDING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+		createdAt: string;
+		items: TicketItem[];
+		formattedDate?: string;
+		totalItems?: number;
 	};
 
-	let recentTransactions: Transaction[] = $state([]);
-	let isLoadingTransactions: boolean = $state(true);
+	let activeOrders: Ticket[] = $state([]);
+	let isLoadingOrders: boolean = $state(true);
 
 	$effect(() => {
-		isLoadingTransactions = true;
-		fetch('/api/wallet/history')
+		isLoadingOrders = true;
+		fetch('/api/orders?status=PENDING&status=READY&limit=5')
 			.then((res: Response) => res.json())
-			.then((result: { success: boolean; data: RawTransaction[] }) => {
+			.then((result: { success: boolean; data: { tickets: Ticket[] } }) => {
 				if (result.success) {
-					recentTransactions = result.data.map((tx: RawTransaction): Transaction => {
-						const d: Date = new Date(tx.createdAt);
-						const dateStr: string = d.toLocaleDateString(undefined, { weekday: 'short' });
-						const timeStr: string = d.toLocaleTimeString(undefined, {
-							hour: 'numeric',
-							minute: '2-digit'
-						});
+					activeOrders = result.data.tickets.map((t: Ticket): Ticket => {
+						const d: Date = new Date(t.createdAt);
 						return {
-							id: tx.id,
-							type: tx.type === 'CREDIT' ? 'credit' : 'debit',
-							title: tx.description,
-							date: `${dateStr} · ${timeStr}`,
-							amount: Number(tx.amount)
+							...t,
+							formattedDate: `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`,
+							totalItems: t.items.reduce((acc: number, item: TicketItem) => acc + item.quantity, 0)
 						};
 					});
 				}
 			})
-			.catch((err: Error) => console.error('Failed to fetch transactions:', err))
-			.finally(() => (isLoadingTransactions = false));
+			.catch((err: Error) => console.error('Failed to fetch active orders:', err))
+			.finally(() => (isLoadingOrders = false));
 	});
 
 	function cancelOrder(): void {
@@ -77,110 +69,100 @@
 		goto(resolve('/menu'));
 	}
 
-	function addToCart(item: MenuItem): void {
-		const existing: CartItem | undefined = appState.cart.find(
-			(c: CartItem) => c.menuItem.id === item.id
-		);
-		if (existing) {
-			existing.quantity += 1;
-		} else {
-			appState.cart.push({ menuItem: item, quantity: 1 });
+	function getStatusConfig(status: string): {
+		icon: typeof CheckCircle2;
+		color: string;
+		bg: string;
+	} {
+		switch (status) {
+			case 'COMPLETED':
+				return { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-500/10' };
+			case 'READY':
+				return { icon: Utensils, color: 'text-blue-600', bg: 'bg-blue-500/10' };
+			case 'PENDING':
+				return { icon: Clock, color: 'text-amber-600', bg: 'bg-amber-500/10' };
+			case 'CANCELLED':
+				return { icon: XCircle, color: 'text-destructive', bg: 'bg-destructive/10' };
+			default:
+				return { icon: ReceiptText, color: 'text-foreground/50', bg: 'bg-muted/50' };
 		}
 	}
 
-	function removeFromCart(item: MenuItem): void {
-		const index: number = appState.cart.findIndex((c: CartItem) => c.menuItem.id === item.id);
-		if (index !== -1) {
-			if (appState.cart[index].quantity > 1) {
-				appState.cart[index].quantity -= 1;
-			} else {
-				appState.cart.splice(index, 1);
-			}
-		}
-	}
-
-	function getQty(id: string): number {
-		return appState.cart.find((c: CartItem) => c.menuItem.id === id)?.quantity ?? 0;
-	}
-
-	const categoryOrder: string[] = ['Breakfast', 'Lunch', 'Snacks', 'Beverages'];
-	const categoryIcons: Record<string, typeof Sunrise> = {
-		Breakfast: Sunrise,
-		Lunch: Sandwich,
-		Snacks: Pizza,
-		Beverages: Coffee
+	type CategoryConfig = {
+		Icon: typeof Sunrise;
+		accent: string;
+		iconColor: string;
+		dot: string;
+		label: string;
 	};
 
-	let activeCategory: string = $state('Breakfast');
+	const categoryConfig: Record<string, CategoryConfig> = {
+		Breakfast: {
+			Icon: Sunrise,
+			accent: 'bg-amber-50',
+			iconColor: 'text-amber-500',
+			dot: 'bg-amber-400',
+			label: 'Breakfast'
+		},
+		Lunch: {
+			Icon: Sandwich,
+			accent: 'bg-lime-50',
+			iconColor: 'text-lime-600',
+			dot: 'bg-lime-400',
+			label: 'Lunch'
+		},
+		Snacks: {
+			Icon: Pizza,
+			accent: 'bg-rose-50',
+			iconColor: 'text-rose-500',
+			dot: 'bg-rose-400',
+			label: 'Snacks'
+		},
+		Beverages: {
+			Icon: Coffee,
+			accent: 'bg-sky-50',
+			iconColor: 'text-sky-500',
+			dot: 'bg-sky-400',
+			label: 'Beverages'
+		}
+	};
 
-	let summaryItems: MenuItem[] = $derived(
-		appState.menuItems.filter((item: MenuItem) => item.category === activeCategory).slice(0, 4)
-	);
+	const categoryOrder: string[] = ['Breakfast', 'Lunch', 'Snacks', 'Beverages'];
+	const categoryTaglines: Record<string, string> = {
+		Breakfast: 'Start your day right',
+		Lunch: 'Midday favourites',
+		Snacks: 'Between-meal bites',
+		Beverages: 'Hot & cold drinks'
+	};
 
 	let availableCategories: string[] = $derived(
-		categoryOrder.filter((cat: string) =>
-			appState.menuItems.some((item: MenuItem) => item.category === cat)
+		categoryOrder.filter((cat: string): boolean =>
+			appState.menuItems.some((item: MenuItem): boolean => item.category === cat)
 		)
 	);
-
-	let cartTotalQty: number = $derived(
-		appState.cart.reduce((acc: number, curr: CartItem) => acc + curr.quantity, 0)
-	);
-
-	let cartTotalPrice: number = $derived(
-		appState.cart.reduce(
-			(acc: number, curr: CartItem) => acc + curr.menuItem.price * curr.quantity,
-			0
-		)
-	);
-
-	$effect(() => {
-		if (availableCategories.length > 0 && !availableCategories.includes(activeCategory)) {
-			activeCategory = availableCategories[0];
-		}
-	});
-
-	function handleCheckout(): void {
-		if (!appState.wallet || appState.wallet.balance < cartTotalPrice) return;
-
-		appState.activeTicket = {
-			id: 'NEX-' + Math.floor(10000 + Math.random() * 90000).toString(),
-			items: [...appState.cart],
-			total: cartTotalPrice,
-			timestamp: new Date(),
-			status: 'PENDING'
-		};
-		appState.cart = [];
-		goto(resolve('/ticket'));
-	}
 </script>
 
 <svelte:head><title>Dashboard | MunchUp</title></svelte:head>
 
 {#if appState.wallet}
-	<div class="animate-in fade-in min-h-screen bg-background pb-28 duration-300">
-		<div class="flex items-center justify-between px-5 pt-6 pb-0">
+	<div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
+		<header
+			class="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-3 bg-background/15 px-5 backdrop-blur-md"
+		>
 			<AppLogo />
 			<button
-				class="relative flex h-10 w-10 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
+				onclick={() => goto(resolve('/profile'))}
+				aria-label="Profile"
+				class="relative flex h-8 w-8 items-center justify-center rounded-full bg-primary text-background transition-all duration-150 hover:scale-105 active:scale-90"
 			>
-				<Bell size={18} strokeWidth={2} />
-				<span
-					class="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-primary ring-2 ring-background"
-				></span>
+				<User size={16} strokeWidth={2} />
 			</button>
-		</div>
+		</header>
 
 		<div class="px-5 pt-5">
-			<h1 class="text-[26px] font-bold tracking-tight text-foreground">
-				Hi, {appState.wallet.name.split(' ')[0]} 👋
-			</h1>
-
 			{#if appState.activeTicket}
-				<p class="mt-1 text-[15px] font-medium text-foreground/45">Here is your pending order.</p>
-
 				<div
-					class="mt-4 overflow-hidden rounded-3xl border border-muted/30 bg-card shadow-[0_2px_16px_rgb(0,0,0,0.05)]"
+					class="mt-1 overflow-hidden rounded-3xl border border-muted/30 bg-card shadow-[0_2px_16px_rgb(0,0,0,0.05)]"
 				>
 					<div class="flex items-center justify-between bg-primary/8 px-5 py-3.5">
 						<div class="flex items-center gap-2">
@@ -198,6 +180,7 @@
 							Not Charged
 						</span>
 					</div>
+
 					<div class="divide-y divide-muted/20 px-5">
 						{#each appState.activeTicket.items as item (item.menuItem.id)}
 							<div class="flex items-center justify-between py-3">
@@ -209,29 +192,32 @@
 									</span>
 									<span class="text-[14px] font-medium text-foreground">{item.menuItem.name}</span>
 								</div>
-								<span class="text-[14px] font-bold text-foreground"
-									>₹{item.menuItem.price * item.quantity}</span
-								>
+								<span class="font-mono text-[14px] font-bold text-foreground">
+									{formatCurrencyINR(item.menuItem.price * item.quantity)}
+								</span>
 							</div>
 						{/each}
 					</div>
+
 					<div
 						class="flex items-center justify-between border-t border-muted/20 bg-muted/20 px-5 py-3.5"
 					>
 						<span class="text-[13px] text-foreground/50">Due on collection</span>
-						<span class="text-[17px] font-bold text-foreground">₹{appState.activeTicket.total}</span
-						>
+						<span class="font-mono text-[17px] font-bold text-foreground">
+							{formatCurrencyINR(appState.activeTicket.total)}
+						</span>
 					</div>
+
 					<div class="grid grid-cols-2 gap-2.5 bg-muted/20 px-5 pt-2 pb-5">
 						<button
 							onclick={cancelOrder}
-							class="rounded-full border border-destructive/25 bg-card py-3 text-[13px] font-bold text-destructive transition-all active:scale-[0.98]"
+							class="rounded-full border border-destructive/25 bg-card py-3 text-[13px] font-bold text-destructive transition-all duration-150 active:scale-[0.98]"
 						>
 							Cancel
 						</button>
 						<a
 							href={resolve('/ticket')}
-							class="flex items-center justify-center gap-2 rounded-full bg-primary py-3 text-[13px] font-bold text-background transition-all active:scale-[0.98]"
+							class="flex items-center justify-center gap-2 rounded-full bg-primary py-3 text-[13px] font-bold text-background transition-all duration-150 active:scale-[0.98]"
 						>
 							<QrCode size={16} />
 							View QR
@@ -239,120 +225,69 @@
 					</div>
 				</div>
 			{:else}
-				<p class="text-sm font-medium text-foreground/45">What are you craving for today?</p>
-
-				<div class="mt-6 flex scrollbar-none gap-2 overflow-x-auto">
-					{#each availableCategories as cat (cat)}
-						{@const Icon = categoryIcons[cat] ?? UtensilsCrossed}
-						<button
-							onclick={() => (activeCategory = cat)}
-							class="flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-all duration-200 active:scale-95 {activeCategory ===
-							cat
-								? 'bg-primary text-background shadow-sm'
-								: 'bg-muted/50 text-foreground/50 hover:bg-muted hover:text-foreground'}"
-						>
-							<Icon size={12} strokeWidth={2} />
-							{cat}
-						</button>
-					{/each}
-				</div>
-
-				<div class="mt-3">
-					<div
-						class="overflow-hidden rounded-[22px] border border-muted/25 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
-					>
-						{#each [0, 1, 2, 3] as i (i)}
-							<div
-								class="flex h-19 items-center gap-3 px-4 {i < 3 ? 'border-b border-muted/20' : ''}"
-							>
-								{#if summaryItems[i]}
-									{@const item = summaryItems[i]}
-									{@const qty = getQty(item.id)}
-									<div
-										class="flex h-3.5 w-3.5 shrink-0 items-center justify-center self-center rounded-sm border-2 {item.dietary ===
-										'veg'
-											? 'border-emerald-500'
-											: 'border-red-500'}"
-									>
-										<div
-											class="h-1.5 w-1.5 rounded-full {item.dietary === 'veg'
-												? 'bg-emerald-500'
-												: 'bg-red-500'}"
-										></div>
-									</div>
-									<div class="min-w-0 flex-1">
-										<p class="truncate text-[14px] font-semibold text-foreground">{item.name}</p>
-										<p class="text-[13px] font-bold text-accent">₹{item.price}</p>
-									</div>
-									{#if qty > 0}
-										<div class="flex items-center gap-1 rounded-full bg-primary/8 p-1">
-											<button
-												onclick={() => removeFromCart(item)}
-												class="flex h-7 w-7 items-center justify-center rounded-full bg-card text-foreground shadow-sm transition-transform active:scale-90"
-											>
-												<Minus size={12} strokeWidth={2.5} />
-											</button>
-											<span class="w-5 text-center text-[13px] font-bold text-foreground"
-												>{qty}</span
-											>
-											<button
-												onclick={() => addToCart(item)}
-												class="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-transform active:scale-90"
-											>
-												<Plus size={12} strokeWidth={2.5} />
-											</button>
-										</div>
-									{:else}
-										<button
-											onclick={() => addToCart(item)}
-											class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary transition-all active:scale-90 active:bg-primary/20"
-										>
-											<Plus size={16} strokeWidth={2.5} />
-										</button>
-									{/if}
-								{/if}
-							</div>
-						{/each}
-
-						<div class="border-t border-muted/20 bg-muted/5 p-3">
-							{#if (appState.wallet?.balance || 0) < cartTotalPrice && cartTotalQty > 0}
-								<div class="mb-2 flex items-center justify-between px-1">
-									<span class="text-[11px] font-bold tracking-wide text-foreground/40 uppercase"
-										>Total: ₹{cartTotalPrice.toFixed(2)}</span
-									>
-									<span class="text-[12px] font-semibold text-destructive"
-										>Insufficient Balance</span
-									>
-								</div>
-							{/if}
-							<button
-								disabled={cartTotalQty === 0 || (appState.wallet?.balance || 0) < cartTotalPrice}
-								onclick={handleCheckout}
-								class="flex w-full items-center justify-between rounded-xl px-4 py-3 text-[14px] font-bold transition-all active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 {(appState
-									.wallet?.balance || 0) < cartTotalPrice && cartTotalQty > 0
-									? 'bg-muted text-foreground/40'
-									: 'bg-primary text-background'}"
-							>
-								<span class="flex items-center gap-2">
-									Checkout
-									{#if cartTotalQty > 0 && (appState.wallet?.balance || 0) >= cartTotalPrice}
-										<span class="rounded-full bg-background/20 px-2 py-0.5 text-[11px]"
-											>{cartTotalQty}</span
-										>
-									{/if}
-								</span>
-								<span class="flex items-center gap-1">
-									₹{cartTotalPrice.toFixed(2)}
-									<ChevronRight size={16} strokeWidth={2.5} />
-								</span>
-							</button>
+				<div class="mt-1">
+					<div class="mb-4 flex items-baseline justify-between">
+						<div>
+							<h2 class="text-[17px] font-bold text-foreground">Categories</h2>
+							<p class="mt-0.5 text-[13px] font-medium text-foreground/40">What are you craving?</p>
 						</div>
+						<a
+							href={resolve('/menu')}
+							class="flex items-center gap-0.5 text-[13px] font-semibold text-primary"
+						>
+							All <ChevronRight size={14} strokeWidth={2.5} />
+						</a>
+					</div>
+
+					<div
+						class="flex snap-x snap-mandatory scrollbar-none flex-row gap-3 overflow-x-auto px-5 pb-2"
+					>
+						{#each availableCategories as cat (cat)}
+							{@const cfg = categoryConfig[cat] ?? {
+								Icon: UtensilsCrossed,
+								accent: 'bg-muted/40',
+								iconColor: 'text-foreground/60',
+								dot: 'bg-foreground/30',
+								label: cat
+							}}
+							{@const Icon = cfg.Icon}
+							{@const count = appState.menuItems.filter(
+								(item: MenuItem): boolean => item.category === cat
+							).length}
+
+							<a
+								href="{resolve('/menu')}?category={cat.toLowerCase()}"
+								class="{cfg.accent} group relative flex w-37 shrink-0 snap-start flex-col gap-3 rounded-2xl border border-muted/25 px-4 pt-4 pb-3.5 shadow-[0_1px_4px_rgb(0,0,0,0.05)] transition-all duration-150 hover:border-muted/50 hover:shadow-[0_2px_8px_rgb(0,0,0,0.08)] active:scale-95"
+							>
+								<div class="flex items-center justify-between">
+									<div
+										class="flex h-10 w-10 items-center justify-center rounded-xl bg-background {cfg.iconColor} transition-transform duration-150 group-active:scale-90"
+									>
+										<Icon size={20} strokeWidth={2} />
+									</div>
+									<span
+										class="flex h-5 w-5 items-center justify-center rounded-full {cfg.iconColor} bg-background text-[10px] font-bold"
+									>
+										{count}
+									</span>
+								</div>
+								<div>
+									<p class="text-[14px] leading-tight font-bold text-foreground">{cfg.label}</p>
+									<p class="mt-0.5 text-[11px] leading-tight font-medium text-foreground/40">
+										{categoryTaglines[cat]}
+									</p>
+								</div>
+								<div
+									class="absolute right-4 bottom-0 left-4 h-[2.5px] rounded-full {cfg.dot} opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-active:opacity-100"
+								></div>
+							</a>
+						{/each}
 					</div>
 				</div>
 
 				<a
 					href={resolve('/menu')}
-					class="group relative mt-4 block overflow-hidden rounded-3xl bg-[#0f2544] px-6 py-7 shadow-[0_8px_32px_rgba(15,37,68,0.35)] transition-transform duration-300 active:scale-[0.98]"
+					class="group relative mt-5 block overflow-hidden rounded-3xl bg-[#0f2544] px-6 py-7 shadow-[0_8px_32px_rgba(15,37,68,0.35)] transition-transform duration-300 active:scale-[0.98]"
 				>
 					<div
 						class="pointer-events-none absolute -top-10 -left-10 h-52 w-52 animate-pulse rounded-full bg-orange-500/40 blur-3xl [animation-duration:3s]"
@@ -363,23 +298,26 @@
 					<div
 						class="pointer-events-none absolute -bottom-12 left-1/2 h-40 w-40 -translate-x-1/2 animate-pulse rounded-full bg-rose-500/30 blur-3xl [animation-delay:2s] [animation-duration:5s]"
 					></div>
-					<div
-						class="pointer-events-none absolute top-0 -right-4 h-32 w-32 animate-pulse rounded-full bg-emerald-400/20 blur-2xl [animation-delay:0.5s] [animation-duration:3.5s]"
-					></div>
 
 					<div class="relative z-10">
-						<p class="text-[11px] font-bold tracking-[0.14em] text-white/40 uppercase">Full Menu</p>
+						<p
+							class="flex items-center gap-1.5 text-[11px] font-bold tracking-[0.14em] text-white/40 uppercase"
+						>
+							<UtensilsCrossed size={12} strokeWidth={2.5} />
+							Full Menu
+						</p>
 						<h2 class="mt-2 text-[26px] leading-tight font-black tracking-tight text-white">
-							Good Food,<br />Good Mood.
+							View Everything
 						</h2>
 						<p class="mt-2 text-[14px] leading-relaxed font-medium text-white/55">
-							Browse everything on today's canteen menu<br />and add to your cart in seconds.
+							Skip the line. Browse today's fresh canteen specials and order your favorites
+							instantly.
 						</p>
 
 						<div
 							class="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/12 px-5 py-2.5 text-[13px] font-bold text-white backdrop-blur-sm transition-all duration-200 group-hover:gap-3 group-hover:border-white/25 group-hover:bg-white/20 group-active:scale-95"
 						>
-							Browse the menu
+							Explore the Menu
 							<ArrowRight
 								size={15}
 								strokeWidth={2.5}
@@ -391,7 +329,7 @@
 			{/if}
 		</div>
 
-		<div class="mt-6 space-y-6 px-5">
+		<div class="mt-6 space-y-5 px-5">
 			<div
 				class="relative overflow-hidden rounded-[28px] bg-linear-to-br from-primary to-accent px-6 py-5 shadow-[0_4px_24px_rgba(15,37,68,0.18)]"
 			>
@@ -408,8 +346,8 @@
 							Wallet Balance
 						</p>
 					</div>
-					<p class="mt-1.5 text-[36px] font-bold tracking-tight text-white">
-						₹{appState.wallet.balance.toFixed(2)}
+					<p class="mt-1.5 font-mono text-2xl font-bold tracking-tight text-white">
+						{formatCurrencyINR(appState.wallet.balance)}
 					</p>
 					<div class="mt-4 flex items-center justify-between">
 						<p class="text-[12px] font-medium text-background">{appState.wallet.name}</p>
@@ -417,7 +355,7 @@
 							href={resolve('/topup')}
 							class="flex items-center gap-1.5 rounded-full bg-background/80 px-4 py-2 text-[13px] font-black text-primary ring-4 ring-accent/25 backdrop-blur-md transition-all active:scale-95"
 						>
-							<Plus size={14} strokeWidth={2.5} />
+							<span class="text-lg leading-none">+</span>
 							Add Money
 						</a>
 					</div>
@@ -426,9 +364,9 @@
 
 			<div>
 				<div class="mb-3 flex items-center justify-between">
-					<h3 class="text-[17px] font-bold text-foreground">Recent Activity</h3>
+					<h3 class="text-[17px] font-bold text-foreground">Recent Orders</h3>
 					<a
-						href={resolve('/profile/history')}
+						href={resolve('/orders')}
 						class="flex items-center gap-0.5 text-[13px] font-semibold text-primary"
 					>
 						See all <ChevronRight size={14} strokeWidth={2.5} />
@@ -436,9 +374,9 @@
 				</div>
 
 				<div
-					class="overflow-hidden rounded-[20px] border border-muted/25 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					class="mb-12 overflow-hidden rounded-[20px] border border-muted/25 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
 				>
-					{#if isLoadingTransactions}
+					{#if isLoadingOrders}
 						{#each [1, 2, 3] as i (i)}
 							<div
 								class="flex animate-pulse items-center justify-between px-4 py-3.5 {i < 3
@@ -452,47 +390,98 @@
 										<div class="h-2.5 w-16 rounded-full bg-muted/60"></div>
 									</div>
 								</div>
-								<div class="h-3.5 w-10 rounded-full bg-muted"></div>
+								<div class="h-4 w-12 rounded-full bg-muted"></div>
 							</div>
 						{/each}
-					{:else if recentTransactions.length > 0}
-						{#each recentTransactions.slice(0, 3) as tx, i (tx.id)}
-							<div
-								class="flex items-center justify-between px-4 py-3.5 transition-colors active:bg-muted/30 {i <
-								Math.min(recentTransactions.length, 3) - 1
-									? 'border-b border-muted/20'
-									: ''}"
-							>
-								<div class="flex items-center gap-3">
-									<div
-										class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl {tx.type ===
-										'credit'
-											? 'bg-emerald-500/10 text-emerald-600'
-											: 'bg-muted text-foreground/40'}"
-									>
-										{#if tx.type === 'credit'}
-											<ArrowDownLeft size={16} strokeWidth={2.5} />
-										{:else}
-											<ArrowUpRight size={16} strokeWidth={2.5} />
-										{/if}
-									</div>
-									<div>
-										<p class="text-[14px] font-semibold text-foreground">{tx.title}</p>
-										<p class="text-[11px] text-foreground/40">{tx.date}</p>
-									</div>
-								</div>
-								<span
-									class="text-[14px] font-bold {tx.type === 'credit'
-										? 'text-emerald-600'
-										: 'text-foreground'}"
+					{:else if activeOrders.length > 0}
+						<div class="divide-y divide-muted/20">
+							{#each activeOrders as order (order.id)}
+								{@const config = getStatusConfig(order.status)}
+								<div
+									class="flex flex-col px-4 py-4 transition-colors duration-100 active:bg-muted/30"
 								>
-									{tx.type === 'credit' ? '+' : '-'}₹{tx.amount.toFixed(2)}
-								</span>
-							</div>
-						{/each}
+									<div class="flex items-center justify-between">
+										<div class="flex items-center gap-3">
+											<div
+												class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {config.bg} {config.color}"
+											>
+												<config.icon size={18} strokeWidth={2.5} />
+											</div>
+											<div class="min-w-0">
+												<p
+													class="flex items-center gap-2 truncate text-[14px] font-semibold text-foreground"
+												>
+													{order.ticketReference}
+													<span
+														class="rounded-sm bg-muted px-1.5 py-0.5 text-[9px] font-bold tracking-widest text-foreground/50 uppercase"
+													>
+														{order.totalItems} Items
+													</span>
+												</p>
+												<p
+													class="mt-0.5 text-[10px] font-bold tracking-widest text-foreground/40 uppercase"
+												>
+													{order.formattedDate}
+												</p>
+											</div>
+										</div>
+										<div class="flex shrink-0 flex-col items-end gap-1 pl-3">
+											<span class="font-mono text-[14px] font-bold text-foreground">
+												{formatCurrencyINR(Number(order.totalAmount))}
+											</span>
+											<span class="text-[9px] font-bold tracking-wider uppercase {config.color}">
+												{order.status}
+											</span>
+										</div>
+									</div>
+
+									{#if order.items && order.items.length > 0}
+										<div
+											class="mt-3 ml-13 flex flex-col gap-2 border-t border-muted/20 pt-3 text-[13px]"
+										>
+											{#each order.items as item (item)}
+												<div class="flex items-start justify-between text-foreground/70">
+													<div class="flex items-start gap-2.5">
+														<span class="font-bold text-foreground/40">{item.quantity}x</span>
+														<div class="mt-0.5 flex items-center gap-1.5">
+															{#if item.menuItem}
+																<div
+																	class="flex h-3 w-3 shrink-0 items-center justify-center self-center rounded-[2px] border {item
+																		.menuItem.dietary === 'veg'
+																		? 'border-emerald-500/70'
+																		: 'border-red-500/70'}"
+																>
+																	<div
+																		class="h-1.5 w-1.5 rounded-full {item.menuItem.dietary === 'veg'
+																			? 'bg-emerald-500/70'
+																			: 'bg-red-500/70'}"
+																	></div>
+																</div>
+																<span class="font-medium">{item.menuItem.name}</span>
+															{:else}
+																<span class="font-medium text-foreground/50">Unknown Item</span>
+															{/if}
+														</div>
+													</div>
+													<span class="mt-0.5 font-mono text-[12px]">
+														{formatCurrencyINR(Number(item.unitPrice) * item.quantity)}
+													</span>
+												</div>
+											{/each}
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
 					{:else}
 						<div class="px-4 py-10 text-center">
-							<p class="text-[14px] text-foreground/40">No transactions yet.</p>
+							<div
+								class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted/60"
+							>
+								<ReceiptText size={18} strokeWidth={1.75} class="text-foreground/30" />
+							</div>
+							<p class="text-[14px] font-medium text-foreground/40">No active orders.</p>
+							<p class="mt-1 text-[12px] text-foreground/25">Grab a bite and check back here!</p>
 						</div>
 					{/if}
 				</div>

@@ -2,7 +2,7 @@
 	import '../layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/stores';
-	import { Home, UtensilsCrossed, QrCode, User, X, Download, WifiOff } from 'lucide-svelte';
+	import { Home, UtensilsCrossed, QrCode, X, Download, WifiOff, Box } from 'lucide-svelte';
 	import { appState } from '$lib/store.svelte';
 	import { resolve } from '$app/paths';
 	import type { UserWallet, MenuItem } from '$lib/types';
@@ -60,7 +60,7 @@
 		{ path: resolve('/'), icon: Home, label: 'Home' },
 		{ path: resolve('/menu'), icon: UtensilsCrossed, label: 'Menu' },
 		{ path: resolve('/ticket'), icon: QrCode, label: 'Ticket' },
-		{ path: resolve('/profile'), icon: User, label: 'Profile' }
+		{ path: resolve('/orders'), icon: Box, label: 'Orders' }
 	];
 
 	let currentPath = $derived($page.url.pathname);
@@ -202,7 +202,7 @@
 							path ||
 						(path === resolve('/profile') && currentPath.startsWith(resolve('/profile')))
 							? 'text-primary'
-							: 'text-foreground/40 hover:text-foreground/70'}"
+							: 'text-foreground/60 hover:text-foreground/70'}"
 					>
 						{#if path === resolve('/ticket') && appState.activeTicket}
 							<div class="relative">

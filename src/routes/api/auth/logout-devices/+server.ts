@@ -1,29 +1,34 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { userSessions } from '$lib/server/db/schema';
-import { and, eq, not } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ cookies }) => {
-  const userId = "ENTER_USER_UUID_HERE";
-  
-  // The token of the device currently making the request
-  const currentSessionToken = cookies.get('session_id') || ''; 
+export const POST: RequestHandler = async ({ locals }) => {
+	if (!locals.user || !locals.sessionId) {
+		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	}
 
-  try {
-    // Revoke all sessions EXCEPT the current one
-    await db.update(userSessions)
-      .set({ isRevoked: true })
-      .where(
-        and(
-          eq(userSessions.userId, userId),
-          not(eq(userSessions.tokenHash, currentSessionToken)) // Requires hashed token in DB
-        )
-      );
+	const userId = locals.user.id;
 
-    return json({ success: true, message: 'All other devices signed out.' });
-  } catch (error) {
-    console.error('Device logout failed:', error);
-    return json({ success: false, error: 'Failed to manage devices' }, { status: 500 });
-  }
+	try {
+		await db
+			.update(userSessions)
+			.set({ isRevoked: true })
+			.where(and(eq(userSessions.userId, userId)));
+
+		return json({
+			success: true,
+			message: 'Successfully signed out of all other devices.'
+		});
+	} catch (error) {
+		console.error('Device logout failed:', error);
+		return json(
+			{
+				success: false,
+				error: 'Failed to sign out of other devices'
+			},
+			{ status: 500 }
+		);
+	}
 };

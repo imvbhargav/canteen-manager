@@ -14,6 +14,7 @@
 	import jsQR from 'jsqr';
 	import type { QRCode } from 'jsqr';
 	import { resolve } from '$app/paths';
+	import { formatCurrencyINR } from '$lib';
 
 	type ScanState = 'idle' | 'starting' | 'scanning' | 'success' | 'error';
 	type FallbackState = 'hidden' | 'open' | 'submitting' | 'confirmed';
@@ -306,8 +307,9 @@
 					</div>
 					<div class="flex items-start gap-2 rounded-2xl bg-amber-400/10 px-4 py-3 text-amber-600">
 						<span class="text-[12px] leading-relaxed font-medium">
-							<strong class="font-bold">₹{appState.activeTicket.total}</strong> will be deducted from
-							your wallet only when you scan the counter QR and collect your order.
+							<strong class="font-mono font-bold"
+								>{formatCurrencyINR(appState.activeTicket.total)}</strong
+							> will be deducted from your wallet only when you scan the counter QR and collect your order.
 						</span>
 					</div>
 				{:else if scanState === 'success'}
@@ -319,8 +321,10 @@
 						</div>
 						<div class="text-center">
 							<h3 class="text-[15px] font-bold text-foreground">Order Collected</h3>
-							<p class="mt-0.5 text-[10px] font-bold tracking-widest text-emerald-500 uppercase">
-								₹{appState.activeTicket.total} deducted from wallet
+							<p
+								class="mt-0.5 font-mono text-[10px] font-bold tracking-widest text-emerald-500 uppercase"
+							>
+								{formatCurrencyINR(appState.activeTicket.total)} deducted from wallet
 							</p>
 						</div>
 					</div>
@@ -466,8 +470,8 @@
 										</span>
 									</div>
 								</div>
-								<span class="text-[13px] font-bold text-foreground">
-									₹{item.menuItem.price * item.quantity}
+								<span class="font-mono text-[13px] font-bold text-foreground">
+									{formatCurrencyINR(item.menuItem.price * item.quantity)}
 								</span>
 							</div>
 						{/each}
@@ -476,7 +480,8 @@
 						class="flex items-center justify-between border-t border-muted/20 bg-muted/20 px-4 py-3"
 					>
 						<span class="text-[11px] font-bold text-foreground/60">Due on collection</span>
-						<span class="text-[16px] font-bold text-foreground">₹{appState.activeTicket.total}</span
+						<span class="font-mono text-[16px] font-bold text-foreground"
+							>{formatCurrencyINR(appState.activeTicket.total)}</span
 						>
 					</div>
 				</div>

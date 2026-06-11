@@ -2,12 +2,11 @@
 	import {
 		ArrowRight,
 		Loader2,
-		Fingerprint,
 		ChevronRight,
-		UserPlus,
 		User,
 		ArrowRightLeft,
-		Users
+		Users,
+		Plus
 	} from 'lucide-svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -228,24 +227,21 @@
 						<ChevronRight size={16} strokeWidth={2.5} class="text-foreground/30" />
 					</button>
 				{/each}
-			</div>
-
-			<!-- Side-by-side bottom buttons -->
-			<div class="mt-auto mb-2 flex gap-2 rounded-full bg-accent p-1">
 				<button
 					onclick={() => (currentScreen = 'full')}
-					class="flex flex-1 items-center justify-center gap-2 rounded-full py-3.5 font-bold text-background transition-all"
+					class="flex w-full items-center gap-4 rounded-2xl border border-dashed border-accent/25 bg-card p-4 transition-all active:scale-[0.98] active:bg-muted/30"
 				>
-					<ArrowRight size={14} strokeWidth={2.5} />
-					Login
-				</button>
-
-				<button
-					onclick={() => goto(resolve('/register'))}
-					class="flex flex-1 items-center justify-center gap-2 rounded-full bg-background py-3.5 font-bold text-foreground transition-all"
-				>
-					<UserPlus size={14} strokeWidth={2.5} />
-					Register
+					<div
+						class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted/50 text-[18px] font-black text-foreground/60"
+					>
+						<Plus class="h-4 w-4" />
+					</div>
+					<div class="flex-1 text-left">
+						<span class="block text-[14px] font-bold text-foreground"> Add new profile </span>
+						<span class="mt-0.5 block text-[11px] font-medium tracking-wide text-foreground/50">
+							Login with a different user to save
+						</span>
+					</div>
 				</button>
 			</div>
 		</div>
@@ -258,13 +254,21 @@
 				<p class="text-[13px] font-medium text-foreground/50">Enter your pin to login.</p>
 			</div>
 
-			<div class="mt-12 rounded-2xl bg-linear-to-b from-primary/75 to-transparent p-2">
+			<div class="relative mt-12 rounded-2xl bg-linear-to-b from-primary/75 to-transparent p-2">
+				<button
+					onclick={goBack}
+					class="absolute -top-3 -right-3 flex items-center gap-2 rounded-full border-2 border-primary/75 bg-background px-4 py-1 text-xs text-foreground"
+				>
+					<ArrowRightLeft class="h-4 w-4" />
+					<span> Change </span>
+				</button>
+
 				<div class="flex items-center justify-between px-2">
 					<div class="flex items-center gap-2 rounded-t-2xl px-4 pt-4 pb-8">
 						<div
-							class="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-[24px] font-black text-primary"
+							class="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-[24px] font-black text-primary"
 						>
-							<User class="h-4 w-4" />
+							<User class="h-6 w-6" />
 						</div>
 						<div>
 							<p class="text-xs font-medium tracking-wide text-foreground/50 uppercase">
@@ -275,13 +279,6 @@
 							</p>
 						</div>
 					</div>
-					<button
-						onclick={goBack}
-						class="flex items-center gap-2 rounded-full border border-accent bg-accent/75 px-2 py-1 text-xs text-background"
-					>
-						<ArrowRightLeft class="h-4 w-4" />
-						<span> Change </span>
-					</button>
 				</div>
 
 				<div class="-mt-4 flex flex-col items-center rounded-2xl bg-background">
@@ -315,14 +312,6 @@
 							class="pointer-events-none absolute inset-0 cursor-default opacity-0"
 							autocomplete="current-password"
 						/>
-					</button>
-
-					<button
-						type="button"
-						class="my-8 flex items-center gap-2 rounded-full bg-accent/25 px-4 py-2 text-[12px] font-bold text-foreground/50 transition-colors active:text-foreground/80"
-					>
-						<Fingerprint size={15} strokeWidth={2.5} />
-						Use Biometrics
 					</button>
 				</div>
 			</div>
@@ -367,14 +356,14 @@
 						for="identifier"
 						class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
 					>
-						Student ID or Roll No.
+						User ID.
 					</label>
 					<input
 						id="identifier"
 						type="text"
 						bind:value={identifier}
 						class="w-full rounded-xl border border-muted/30 bg-muted/40 px-4 py-3 text-[14px] font-bold text-foreground uppercase transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/30 focus:bg-muted/60"
-						placeholder="STU-XXXXX or 10445"
+						placeholder="BMS10445"
 						autocomplete="username"
 					/>
 				</div>
@@ -423,13 +412,13 @@
 				</button>
 			</form>
 
-			<div class="mt-auto pt-8 pb-2 text-center">
+			<div class="mt-auto mb-4 rounded-2xl bg-accent/15 px-2 pt-4 pb-2 text-center">
 				<p class="mb-2 text-[10px] font-bold tracking-widest text-foreground/40 uppercase">
 					New to Campus?
 				</p>
 				<button
 					onclick={() => goto(resolve('/register'))}
-					class="text-[13px] font-bold text-foreground transition-opacity active:opacity-60"
+					class="w-full rounded-xl bg-background py-2 text-[13px] font-bold text-foreground transition-opacity active:opacity-60"
 				>
 					Create an account →
 				</button>

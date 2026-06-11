@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { formatCurrencyINR } from '$lib';
 	import { appState } from '$lib/store.svelte';
 	import { ArrowLeft, ArrowDownLeft, ArrowUpRight } from 'lucide-svelte';
 
@@ -89,8 +90,8 @@
 				<p class="text-[10px] font-bold tracking-[0.15em] text-foreground/50 uppercase">
 					Remaining Balance
 				</p>
-				<p class="mt-1 text-[32px] font-black tracking-tight text-foreground">
-					₹{remaining.toFixed(2)}
+				<p class="mt-1 font-mono text-[32px] font-black tracking-tight text-foreground">
+					{formatCurrencyINR(remaining)}
 				</p>
 			</div>
 			<div class="grid grid-cols-2 divide-x divide-muted/20">
@@ -101,8 +102,8 @@
 					{#if isLoadingHistory}
 						<div class="mx-auto mt-1.5 h-5 w-16 animate-pulse rounded-full bg-muted/50"></div>
 					{:else}
-						<p class="mt-0.5 text-[16px] font-bold text-foreground">
-							₹{totalAdded.toFixed(2)}
+						<p class="mt-0.5 font-mono text-[16px] font-bold text-foreground">
+							{formatCurrencyINR(totalAdded)}
 						</p>
 					{/if}
 				</div>
@@ -113,8 +114,8 @@
 					{#if isLoadingHistory}
 						<div class="mx-auto mt-1.5 h-5 w-16 animate-pulse rounded-full bg-muted/50"></div>
 					{:else}
-						<p class="mt-0.5 text-[16px] font-bold text-foreground">
-							₹{totalSpent.toFixed(2)}
+						<p class="mt-0.5 font-mono text-[16px] font-bold text-foreground">
+							{formatCurrencyINR(totalSpent)}
 						</p>
 					{/if}
 				</div>
@@ -177,7 +178,9 @@
 										? 'text-emerald-600'
 										: 'text-foreground'}"
 								>
-									{tx.type === 'credit' ? '+' : '-'}₹{tx.amount.toFixed(2)}
+									{tx.type === 'credit' ? '+' : '-'}<span class="font-mono"
+										>{formatCurrencyINR(tx.amount)}</span
+									>
 								</span>
 							</div>
 						{/each}

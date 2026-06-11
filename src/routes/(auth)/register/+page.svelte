@@ -1,7 +1,9 @@
 <script lang="ts">
-	import { ArrowLeft, Loader2, Check } from 'lucide-svelte';
-	import { resolve } from '$app/paths';
+	import { Loader2, Check } from 'lucide-svelte';
 	import { onMount } from 'svelte';
+	import AppLogo from '$lib/components/AppLogo.svelte';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	onMount(() => {
 		const setHeight = () => {
@@ -64,25 +66,16 @@
 >
 	<!-- ── Header ── -->
 	<header class="flex h-16 shrink-0 items-center gap-3 px-5">
-		<a
-			href={resolve('/login')}
-			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
-		>
-			<ArrowLeft size={18} strokeWidth={2.5} />
-		</a>
-
-		<h2 class="flex-1 text-[20px] font-bold tracking-tight text-foreground">Create Account</h2>
-
-		<!-- Spacer: fixed width w-20 so header width never changes -->
-		<div class="flex w-20 justify-end"></div>
+		<div class="mt-2.5">
+			<AppLogo />
+			<p class="text-[13px] font-medium text-foreground/50">
+				Set up your MunchUp profile and digital wallet.
+			</p>
+		</div>
 	</header>
 
 	<!-- ── Body ── -->
-	<div class="flex-1 overflow-y-auto px-5 pt-1">
-		<p class="mb-6 text-[13px] font-medium text-foreground/50">
-			Set up your MunchUp profile and digital wallet.
-		</p>
-
+	<div class="mt-10 flex-1 overflow-y-auto px-5 pt-1">
 		<form onsubmit={handleRegister} class="space-y-5">
 			{#if errorMsg}
 				<div class="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3">
@@ -112,14 +105,14 @@
 					for="rollNumber"
 					class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
 				>
-					Roll No.
+					User ID.
 				</label>
 				<input
 					id="rollNumber"
 					type="text"
 					bind:value={rollNumber}
 					class="w-full rounded-xl border border-muted/30 bg-muted/40 px-4 py-3 font-mono text-[14px] font-bold text-foreground uppercase transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/30 focus:bg-muted/60"
-					placeholder="10445"
+					placeholder="BMS10445"
 					autocomplete="off"
 				/>
 			</div>
@@ -188,5 +181,16 @@
 				{/if}
 			</button>
 		</form>
+	</div>
+	<div class="mt-auto mb-4 rounded-2xl bg-accent/15 px-2 pt-4 pb-2 text-center">
+		<p class="mb-2 text-[10px] font-bold tracking-widest text-foreground/40 uppercase">
+			Alrady have an account?
+		</p>
+		<button
+			onclick={() => goto(resolve('/login'))}
+			class="w-full rounded-xl bg-background py-2 text-[13px] font-bold text-foreground transition-opacity active:opacity-60"
+		>
+			Login →
+		</button>
 	</div>
 </div>
