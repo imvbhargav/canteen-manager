@@ -71,5 +71,19 @@
                 }
             ]
         }
+    ],
+    "screenshots": [
+        {
+            "src": "/screenshots/mobile.png",
+            "sizes": "411x882",
+            "type": "image/png",
+            "form_factor": "narrow"
+        },
+        {
+            "src": "/screenshots/wide.png",
+            "sizes": "1920x986",
+            "type": "image/png",
+            "form_factor": "wide"
+        }
     ]
 }
