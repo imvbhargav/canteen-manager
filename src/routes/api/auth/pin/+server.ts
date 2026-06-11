@@ -4,6 +4,7 @@ import { users } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { hashPin } from '$lib/server/auth';
 import type { RequestHandler } from './$types';
+import { verifyPin } from '$lib/server/auth';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	// Ensure user is authenticated
@@ -26,16 +27,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			where: eq(users.id, userId)
 		});
 
-		if (!user) {
-			return json({ success: false, error: 'User not found' }, { status: 404 });
+		if (!user || !user.pinHash || !user.isActive) {
+			return json(
+				{ success: false, error: 'Invalid credentials or account disabled' },
+				{ status: 401 }
+			);
 		}
 
 		// Verify the current PIN
-		// Assuming `hashPin` is a deterministic hash (like SHA-256) based on your registration code.
-		// If you are using bcrypt/argon2, you should import and use a `verifyPin` function instead.
-		const hashedCurrentPin = hashPin(currentPin);
+		const isValid = verifyPin(currentPin, user.pinHash);
 
-		if (user.pinHash !== hashedCurrentPin) {
+		if (isValid) {
 			return json({ success: false, error: 'Incorrect current PIN' }, { status: 403 });
 		}
 
