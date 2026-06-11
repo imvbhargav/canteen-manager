@@ -28,6 +28,7 @@
 	// Snapshot of completed ticket so we can show it after activeTicket is cleared
 	let completedTicket: typeof appState.activeTicket = $state(null);
 	let completedTotal: number = $state(0);
+	let completedTicketRef: string = $state('');
 
 	let videoEl: HTMLVideoElement | undefined = $state();
 	let canvasEl: HTMLCanvasElement | undefined = $state();
@@ -101,7 +102,6 @@
 
 	async function handleSuccessfulScan(securePayload: string): Promise<void> {
 		stopCamera();
-		scanState = 'success';
 		await handleCollected(securePayload);
 	}
 
@@ -165,18 +165,29 @@
 					})
 				});
 
-				const result: { success: boolean; error?: string } = await response.json();
+				const result: {
+					success: boolean;
+					error?: string;
+					data?: {
+						id: string;
+						ticketReference: string;
+						totalAmount: string;
+						status: string;
+						printStatus: string;
+					};
+				} = await response.json();
 
-				if (result.success) {
+				if (result.success && result.data) {
 					// Snapshot the ticket before clearing it so we can show it on the success screen
 					completedTicket = { ...appState.activeTicket };
-					completedTotal = appState.activeTicket.total;
+					completedTotal = Number(result.data.totalAmount);
+					completedTicketRef = result.data.ticketReference;
 
-					appState.wallet.balance -= appState.activeTicket.total;
-					appState.activeTicket = { ...appState.activeTicket, status: 'COMPLETED' };
+					appState.wallet.balance -= Number(result.data.totalAmount);
 					appState.activeTicket = null;
 
-					// Stay on this page — scanState is already 'success'
+					// Only transition to success AFTER the API confirms — this is what renders the success screen
+					scanState = 'success';
 				} else {
 					scanState = 'error';
 					manualError = result.error || 'Checkout failed. Please try again.';
@@ -235,7 +246,7 @@
 						<CheckCircle size={26} class="text-emerald-500" strokeWidth={2.5} />
 					</div>
 					<div class="text-center">
-						<h3 class="text-[17px] font-bold text-foreground">Order Collected!</h3>
+						<h3 class="text-[17px] font-bold text-foreground">Order Confirmed</h3>
 						<p
 							class="mt-1 font-mono text-[11px] font-bold tracking-widest text-emerald-600 uppercase"
 						>
@@ -254,7 +265,7 @@
 						<span class="text-[9px] font-bold tracking-[0.15em] text-foreground/50 uppercase">
 							Receipt
 						</span>
-						<span class="text-[11px] font-bold text-foreground/50">{completedTicket.id}</span>
+						<span class="text-[11px] font-bold text-foreground/50">{completedTicketRef}</span>
 					</div>
 					<div class="divide-y divide-muted/20 px-4">
 						{#each completedTicket.items as item (item.menuItem.id)}

@@ -43,6 +43,17 @@ interface ReceiptItem {
 	itemTotal: string;
 }
 
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+function generateTicketReference(): string {
+	const letters = Array.from(
+		{ length: 3 },
+		() => LETTERS[Math.floor(Math.random() * LETTERS.length)]
+	).join('');
+	const digits = String(Math.floor(1000 + Math.random() * 9000));
+	return `${letters}${digits}`;
+}
+
 export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!locals.user) {
 		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -119,15 +130,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				.where(eq(users.id, userId))
 				.returning({ newBalance: users.balance });
 
-			const ticketRef: string = `NEX-${Math.floor(10000 + Math.random() * 90000)}`;
-
-			const actualCounterId: string = counterId;
+			const ticketRef: string = generateTicketReference();
 
 			const [newTicket] = await tx
 				.insert(tickets)
 				.values({
 					userId,
-					counterId: actualCounterId,
+					counterId: counterId,
 					ticketReference: ticketRef,
 					totalAmount: serverTotal.toFixed(2),
 					status: 'PENDING',
@@ -166,7 +175,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				itemTotal: item.itemTotal
 			}));
 
-			// Send to BOTH the specific counter (for the desktop app) AND the admin dashboard
 			await pusher.trigger([`counter-${counterId}`, 'admin-orders'], 'NEW_ORDER', {
 				orderId: result.id,
 				counterId: counterId,
@@ -176,7 +184,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			});
 		}
 
-		return json({ success: true, data: result });
+		return json({
+			success: true,
+			data: {
+				...result,
+				ticketReference: result.ticketReference
+			}
+		});
 	} catch (error: unknown) {
 		const errorMessage: string = error instanceof Error ? error.message : 'Unknown error occurred';
 
