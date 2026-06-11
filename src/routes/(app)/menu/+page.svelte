@@ -1,313 +1,590 @@
 <script lang="ts">
 	import { appState } from '$lib/store.svelte';
-	import { ArrowLeft, Plus, Minus, ShoppingBag } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
-	import type { MenuItem } from '$lib/types';
+	import {
+		ArrowLeft,
+		QrCode,
+		ScanLine,
+		CheckCircle,
+		X,
+		Hash,
+		ShoppingBag,
+		Loader2,
+		Home
+	} from 'lucide-svelte';
+	import jsQR from 'jsqr';
+	import type { QRCode } from 'jsqr';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/stores';
 	import { formatCurrencyINR } from '$lib';
 
-	// ── Read ?category= param and pre-select the tab ──────────────────────────
-	const categoryOrder = ['Breakfast', 'Lunch', 'Snacks', 'Beverages'];
+	type ScanState = 'idle' | 'starting' | 'scanning' | 'success' | 'error';
+	type FallbackState = 'hidden' | 'open' | 'submitting' | 'confirmed';
 
-	function resolveInitialCategory(): string {
-		const param = $page.url.searchParams.get('category');
-		if (!param) return 'All';
-		const match = categoryOrder.find((c) => c.toLowerCase() === param.toLowerCase());
-		return match ?? 'All';
-	}
+	let scanState: ScanState = $state('idle');
+	let fallbackState: FallbackState = $state('hidden');
+	let manualOrderId: string = $state('');
+	let manualError: string = $state('');
 
-	let activeCategory = $state(resolveInitialCategory());
+	// Snapshot of completed ticket so we can show it after activeTicket is cleared
+	let completedTicket: typeof appState.activeTicket = $state(null);
+	let completedTotal: number = $state(0);
 
-	// ── Derived totals ─────────────────────────────────────────────────────────
-	let total = $derived(
-		appState.cart.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0)
-	);
-	let itemCount = $derived(appState.cart.reduce((sum, item) => sum + item.quantity, 0));
+	let videoEl: HTMLVideoElement | undefined = $state();
+	let canvasEl: HTMLCanvasElement | undefined = $state();
+	let stream: MediaStream | null = null;
+	let animationFrameId: number;
 
-	// ── Menu refresh every 5 s ────────────────────────────────────────────────
 	$effect(() => {
-		const fetchLatestMenu = async () => {
-			try {
-				const res = await fetch('/api/menu');
-				if (res.ok) {
-					const result = await res.json();
-					if (result.success && Array.isArray(result.data)) {
-						appState.menuItems = result.data;
-						const availableIds = new Set(result.data.map((item: MenuItem) => item.id));
-						appState.cart = appState.cart.filter((cartItem) =>
-							availableIds.has(cartItem.menuItem.id)
-						);
-					}
-				}
-			} catch (err) {
-				console.error('Failed to refresh menu:', err);
-			}
-		};
-		const intervalId = setInterval(fetchLatestMenu, 5000);
-		return () => clearInterval(intervalId);
+		return () => stopCamera();
 	});
 
-	// ── Cart helpers ──────────────────────────────────────────────────────────
-	function addToCart(item: MenuItem) {
-		const existing = appState.cart.find((c) => c.menuItem.id === item.id);
-		if (existing) {
-			existing.quantity += 1;
-		} else {
-			appState.cart.push({ menuItem: item, quantity: 1 });
+	async function startCamera(): Promise<void> {
+		scanState = 'starting';
+		manualError = '';
+
+		try {
+			stream = await navigator.mediaDevices.getUserMedia({
+				video: { facingMode: 'environment' }
+			});
+
+			scanState = 'scanning';
+
+			setTimeout(() => {
+				if (videoEl) {
+					videoEl.srcObject = stream;
+					videoEl.setAttribute('playsinline', 'true');
+					videoEl.play();
+					requestAnimationFrame(scanLoop);
+				}
+			}, 50);
+		} catch (err: unknown) {
+			console.error(err);
+			scanState = 'error';
+			manualError = 'Camera access denied. Please use manual entry.';
 		}
 	}
 
-	function removeFromCart(item: MenuItem) {
-		const index = appState.cart.findIndex((c) => c.menuItem.id === item.id);
-		if (index !== -1) {
-			if (appState.cart[index].quantity > 1) {
-				appState.cart[index].quantity -= 1;
-			} else {
-				appState.cart.splice(index, 1);
+	function scanLoop(): void {
+		if (scanState !== 'scanning' || !videoEl || !canvasEl) return;
+
+		if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
+			canvasEl.height = videoEl.videoHeight;
+			canvasEl.width = videoEl.videoWidth;
+			const ctx: CanvasRenderingContext2D | null = canvasEl.getContext('2d', {
+				willReadFrequently: true
+			});
+
+			if (ctx) {
+				ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+				const imageData: ImageData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
+
+				const code: QRCode | null = jsQR(imageData.data, imageData.width, imageData.height, {
+					inversionAttempts: 'dontInvert'
+				});
+
+				if (code) {
+					const rawData: string = code.data.trim();
+
+					if (rawData.includes(':') && rawData.length > 30) {
+						handleSuccessfulScan(rawData);
+					} else {
+						stopCamera();
+						scanState = 'error';
+						manualError = 'Invalid QR code. Please scan a valid counter QR.';
+					}
+					return;
+				}
+			}
+		}
+		animationFrameId = requestAnimationFrame(scanLoop);
+	}
+
+	async function handleSuccessfulScan(securePayload: string): Promise<void> {
+		stopCamera();
+		scanState = 'success';
+		await handleCollected(securePayload);
+	}
+
+	function stopCamera(): void {
+		if (stream) {
+			stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+			stream = null;
+		}
+		if (animationFrameId) {
+			cancelAnimationFrame(animationFrameId);
+		}
+	}
+
+	function resetScan(): void {
+		stopCamera();
+		scanState = 'idle';
+	}
+
+	function openFallback(): void {
+		stopCamera();
+		scanState = 'idle';
+		fallbackState = 'open';
+		manualOrderId = '';
+		manualError = '';
+	}
+
+	function closeFallback(): void {
+		fallbackState = 'hidden';
+		manualOrderId = '';
+		manualError = '';
+	}
+
+	function submitManual(): void {
+		if (manualOrderId.trim().toUpperCase() !== appState.activeTicket?.id) {
+			manualError = 'Order ID does not match — ask staff to verify';
+			return;
+		}
+		fallbackState = 'submitting';
+		setTimeout(async () => {
+			fallbackState = 'confirmed';
+			await handleCollected('MANUAL_FALLBACK');
+		}, 1500);
+	}
+
+	async function handleCollected(securePayload: string): Promise<void> {
+		if (appState.activeTicket && appState.wallet) {
+			try {
+				const payload: { id: string; quantity: number }[] = appState.activeTicket.items.map(
+					(i) => ({
+						id: i.menuItem.id,
+						quantity: i.quantity
+					})
+				);
+
+				const response: Response = await fetch('/api/checkout', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						cart: payload,
+						securePayload: securePayload
+					})
+				});
+
+				const result: { success: boolean; error?: string } = await response.json();
+
+				if (result.success) {
+					// Snapshot the ticket before clearing it so we can show it on the success screen
+					completedTicket = { ...appState.activeTicket };
+					completedTotal = appState.activeTicket.total;
+
+					appState.wallet.balance -= appState.activeTicket.total;
+					appState.activeTicket = { ...appState.activeTicket, status: 'COMPLETED' };
+					appState.activeTicket = null;
+
+					// Stay on this page — scanState is already 'success'
+				} else {
+					scanState = 'error';
+					manualError = result.error || 'Checkout failed. Please try again.';
+					fallbackState = 'hidden';
+				}
+			} catch (err: unknown) {
+				console.error(err);
+				scanState = 'error';
+				manualError = 'Network error. Could not connect to the server.';
 			}
 		}
 	}
 
-	function getQty(id: string) {
-		return appState.cart.find((c) => c.menuItem.id === id)?.quantity || 0;
+	function cancelOrder(): void {
+		appState.activeTicket = null;
+		goto(resolve('/menu'));
 	}
-
-	// ── Menu grouping ─────────────────────────────────────────────────────────
-	function groupedMenu() {
-		const groups: Record<string, MenuItem[]> = {};
-		for (const item of appState.menuItems) {
-			if (!groups[item.category]) groups[item.category] = [];
-			groups[item.category].push(item);
-		}
-		return categoryOrder.filter((c) => groups[c]).map((c) => ({ category: c, items: groups[c] }));
-	}
-
-	function filteredMenu() {
-		if (activeCategory === 'All') return groupedMenu();
-		return groupedMenu().filter((g) => g.category === activeCategory);
-	}
-
-	// ── Checkout ──────────────────────────────────────────────────────────────
-	function handleCheckout() {
-		appState.activeTicket = {
-			id: 'NEX-' + Math.floor(10000 + Math.random() * 90000).toString(),
-			items: [...appState.cart],
-			total,
-			timestamp: new Date(),
-			status: 'PENDING'
-		};
-		appState.cart = [];
-		goto(resolve('/ticket'));
-	}
-
-	// ── Wallet shortfall ──────────────────────────────────────────────────────
-	let insufficientBalance = $derived((appState.wallet?.balance ?? 0) < total);
 </script>
 
-<svelte:head><title>Order Food | MunchUp</title></svelte:head>
+<svelte:head><title>Your Ticket | MunchUp</title></svelte:head>
 
 <div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
-	<!-- ── Header ──────────────────────────────────────────────────────────── -->
 	<header
-		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 border-b border-muted/20 bg-background/80 px-5 backdrop-blur-md"
+		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
 	>
 		<a
 			href={resolve('/')}
+			onclick={stopCamera}
 			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
 		>
 			<ArrowLeft size={18} strokeWidth={2.5} />
 		</a>
 
-		<div class="flex-1">
-			<h2 class="text-[20px] leading-none font-bold tracking-tight text-foreground">Menu</h2>
-			{#if activeCategory !== 'All'}
-				<p class="mt-0.5 text-[11px] font-medium text-foreground/40">{activeCategory}</p>
-			{/if}
-		</div>
+		<h2 class="flex-1 text-[20px] font-bold tracking-tight text-foreground">Order Ticket</h2>
 
-		<!-- Cart pill -->
 		<div class="flex w-20 justify-end">
-			{#if itemCount > 0}
+			{#if (appState.activeTicket?.items.length ?? 0) > 0}
 				<div class="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5">
 					<ShoppingBag size={15} strokeWidth={2.5} class="text-primary" />
-					<span class="text-[13px] font-bold text-primary">{itemCount}</span>
+					<span class="text-[13px] font-bold text-primary"
+						>{appState.activeTicket?.items.length}</span
+					>
 				</div>
 			{/if}
 		</div>
 	</header>
 
-	<!-- ── Category filter tabs ────────────────────────────────────────────── -->
-	<div
-		class="flex shrink-0 scrollbar-none gap-2 overflow-x-auto border-b border-muted/15 px-5 py-3"
-	>
-		{#each ['All', ...categoryOrder] as cat (cat)}
-			<button
-				onclick={() => (activeCategory = cat)}
-				class="shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-all duration-150 active:scale-95
-				{activeCategory === cat
-					? 'bg-primary text-background shadow-sm'
-					: 'bg-muted/50 text-foreground/55 hover:bg-muted hover:text-foreground'}"
-			>
-				{cat}
-			</button>
-		{/each}
-	</div>
-
-	<!-- ── Menu list ───────────────────────────────────────────────────────── -->
-	<!--
-		Bottom padding is always pb-36 regardless of whether the checkout bar is
-		visible, so the list doesn't jump when it appears / disappears.
-	-->
-	<div class="flex-1 overflow-y-auto pb-36">
-		{#each filteredMenu() as group (group.category)}
-			<div class="px-5 pt-4 pb-6">
-				<!-- Section header -->
-				<div class="mb-3 flex items-center gap-3">
-					<h3 class="text-[12px] font-bold tracking-[0.07em] text-foreground/35 uppercase">
-						{group.category}
-					</h3>
-					<div class="h-px flex-1 bg-muted/35"></div>
-					<span class="text-[11px] font-medium text-foreground/25">
-						{group.items.length}
-						{group.items.length === 1 ? 'item' : 'items'}
-					</span>
-				</div>
-
-				<!-- Item card -->
+	<div class="px-5 pt-1 pb-8">
+		{#if scanState === 'success' && completedTicket}
+			<!-- ── Success screen: show completed receipt ── -->
+			<div class="space-y-3">
 				<div
-					class="overflow-hidden rounded-[22px] border border-muted/25 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					class="flex flex-col items-center gap-3 rounded-[20px] border border-emerald-500/25 bg-emerald-500/5 p-5 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
 				>
-					{#each group.items as item, i (item.id)}
-						{@const qty = getQty(item.id)}
-						<div
-							class="flex items-center gap-4 px-4 py-4 transition-colors duration-100
-							{qty > 0 ? 'bg-primary/2' : ''}
-							{i < group.items.length - 1 ? 'border-b border-muted/20' : ''}"
+					<div class="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20">
+						<CheckCircle size={26} class="text-emerald-500" strokeWidth={2.5} />
+					</div>
+					<div class="text-center">
+						<h3 class="text-[17px] font-bold text-foreground">Order Collected!</h3>
+						<p
+							class="mt-1 font-mono text-[11px] font-bold tracking-widest text-emerald-600 uppercase"
 						>
-							<!-- Veg / non-veg dot -->
-							<div
-								class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center self-start rounded-sm border-2
-								{item.dietary === 'veg' ? 'border-emerald-500' : 'border-red-500'}"
-							>
-								<div
-									class="h-1.5 w-1.5 rounded-full
-									{item.dietary === 'veg' ? 'bg-emerald-500' : 'bg-red-500'}"
-								></div>
-							</div>
-
-							<!-- Item info -->
-							<div class="min-w-0 flex-1">
-								<h4 class="text-[15px] leading-snug font-semibold text-foreground">{item.name}</h4>
-								<p class="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-foreground/40">
-									{item.description}
-								</p>
-								<span class="mt-1.5 block font-mono text-[14px] font-bold text-accent"
-									>{formatCurrencyINR(item.price)}</span
-								>
-							</div>
-
-							<!--
-								Stepper container: fixed width so the text column never
-								shifts when the + button becomes a stepper pill.
-							-->
-							<div class="flex w-22 shrink-0 items-center justify-end">
-								{#if qty > 0}
-									<div class="flex items-center gap-0.5 rounded-full bg-primary/8 p-1">
-										<button
-											onclick={() => removeFromCart(item)}
-											aria-label="Remove one {item.name}"
-											class="flex h-7 w-7 items-center justify-center rounded-full bg-card text-foreground shadow-sm transition-transform active:scale-90"
-										>
-											<Minus size={13} strokeWidth={2.5} />
-										</button>
-										<span class="w-7 text-center text-[13px] font-bold text-foreground tabular-nums"
-											>{qty}</span
-										>
-										<button
-											onclick={() => addToCart(item)}
-											aria-label="Add one more {item.name}"
-											class="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-transform active:scale-90"
-										>
-											<Plus size={13} strokeWidth={2.5} />
-										</button>
-									</div>
-								{:else}
-									<button
-										onclick={() => addToCart(item)}
-										aria-label="Add {item.name} to cart"
-										class="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-all duration-150 active:scale-90 active:bg-primary/20"
-									>
-										<Plus size={18} strokeWidth={2.5} />
-									</button>
-								{/if}
-							</div>
-						</div>
-					{/each}
-				</div>
-			</div>
-		{/each}
-
-		<!-- Empty state when a category has no items -->
-		{#if filteredMenu().length === 0}
-			<div class="flex flex-col items-center justify-center px-8 py-24 text-center">
-				<div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted/60">
-					<ShoppingBag size={22} strokeWidth={1.75} class="text-foreground/30" />
-				</div>
-				<p class="text-[15px] font-semibold text-foreground/50">Nothing here yet</p>
-				<p class="mt-1 text-[13px] text-foreground/30">
-					Check back later for {activeCategory} options.
-				</p>
-			</div>
-		{/if}
-	</div>
-
-	<!-- ── Checkout bar ────────────────────────────────────────────────────── -->
-	{#if total > 0}
-		<div
-			class="animate-in slide-in-from-bottom-2 absolute right-0 bottom-0 left-0 z-30 px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] duration-200"
-		>
-			<div
-				class="relative overflow-hidden rounded-[26px] bg-background/75 shadow-[0_-1px_0_rgba(0,0,0,0.06),0_8px_32px_rgba(0,0,0,0.14)] ring-1 ring-black/5 backdrop-blur-2xl backdrop-saturate-150 dark:bg-background/60 dark:ring-white/8"
-			>
-				<!-- Specular highlight -->
-				<div
-					class="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/60 dark:bg-white/15"
-				></div>
-
-				<div class="flex items-center justify-between px-5 pt-4 pb-2">
-					<div>
-						<p class="text-[10px] font-bold tracking-[0.14em] text-foreground/40 uppercase">
-							Order Total
+							{formatCurrencyINR(completedTotal)} deducted from wallet
 						</p>
-						{#if insufficientBalance}
-							<p class="mt-0.5 font-mono text-[11px] font-semibold text-destructive">
-								Balance: {formatCurrencyINR(appState.wallet?.balance ?? 0)}
+					</div>
+				</div>
+
+				<!-- Completed receipt -->
+				<div
+					class="overflow-hidden rounded-[20px] border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+				>
+					<div
+						class="flex items-center justify-between border-b border-muted/20 bg-muted/10 px-4 py-2.5"
+					>
+						<span class="text-[9px] font-bold tracking-[0.15em] text-foreground/50 uppercase">
+							Receipt
+						</span>
+						<span class="text-[11px] font-bold text-foreground/50">{completedTicket.id}</span>
+					</div>
+					<div class="divide-y divide-muted/20 px-4">
+						{#each completedTicket.items as item (item.menuItem.id)}
+							<div class="flex items-center justify-between py-2.5">
+								<div class="flex items-center gap-2.5">
+									<span
+										class="flex h-5 w-5 items-center justify-center rounded-md bg-muted text-[11px] font-bold text-foreground/70"
+									>
+										{item.quantity}
+									</span>
+									<div class="flex flex-col">
+										<span class="text-[13px] font-semibold text-foreground">
+											{item.menuItem.name}
+										</span>
+										<span class="text-[9px] font-bold tracking-widest text-foreground/50 uppercase">
+											{item.menuItem.category}
+										</span>
+									</div>
+								</div>
+								<span class="font-mono text-[13px] font-bold text-foreground">
+									{formatCurrencyINR(item.menuItem.price * item.quantity)}
+								</span>
+							</div>
+						{/each}
+					</div>
+					<div
+						class="flex items-center justify-between border-t border-muted/20 bg-muted/20 px-4 py-3"
+					>
+						<span class="text-[11px] font-bold text-foreground/60">Total paid</span>
+						<span class="font-mono text-[16px] font-bold text-foreground"
+							>{formatCurrencyINR(completedTotal)}</span
+						>
+					</div>
+				</div>
+
+				<!-- Back to Home button -->
+				<div class="pt-2">
+					<a
+						href={resolve('/')}
+						class="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3.5 text-[13px] font-bold text-background transition-all active:scale-[0.98]"
+					>
+						<Home size={15} strokeWidth={2.5} />
+						Back to Home
+					</a>
+				</div>
+			</div>
+		{:else if appState.activeTicket}
+			<div class="space-y-3">
+				{#if scanState === 'idle' || scanState === 'starting' || scanState === 'scanning'}
+					<div
+						class="flex flex-col items-center gap-3 rounded-[20px] border border-muted/30 bg-card p-4 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					>
+						<div class="relative aspect-square w-full overflow-hidden rounded-2xl bg-muted/20">
+							<canvas bind:this={canvasEl} class="hidden"></canvas>
+							<video
+								bind:this={videoEl}
+								class="absolute inset-0 h-full w-full object-cover opacity-90"
+								class:hidden={scanState !== 'scanning'}
+								muted
+								playsinline
+							></video>
+
+							{#if scanState === 'idle'}
+								<div class="absolute inset-0 flex items-center justify-center bg-card/60">
+									<ScanLine size={48} class="text-foreground/30" strokeWidth={1.5} />
+								</div>
+								<div
+									class="absolute top-4 left-4 h-10 w-10 rounded-tl-2xl border-t-[3px] border-l-[3px] border-foreground/40"
+								></div>
+								<div
+									class="absolute top-4 right-4 h-10 w-10 rounded-tr-2xl border-t-[3px] border-r-[3px] border-foreground/40"
+								></div>
+								<div
+									class="absolute bottom-4 left-4 h-10 w-10 rounded-bl-2xl border-b-[3px] border-l-[3px] border-foreground/40"
+								></div>
+								<div
+									class="absolute right-4 bottom-4 h-10 w-10 rounded-br-2xl border-r-[3px] border-b-[3px] border-foreground/40"
+								></div>
+							{/if}
+							{#if scanState === 'starting'}
+								<div
+									class="absolute inset-0 flex animate-pulse items-center justify-center bg-card/60"
+								>
+									<ScanLine size={48} class="text-foreground/30" strokeWidth={1.5} />
+								</div>
+								<div
+									class="absolute top-4 left-4 h-10 w-10 animate-pulse rounded-tl-2xl border-t-[3px] border-l-[3px] border-foreground/40"
+								></div>
+								<div
+									class="absolute top-4 right-4 h-10 w-10 animate-pulse rounded-tr-2xl border-t-[3px] border-r-[3px] border-foreground/40"
+								></div>
+								<div
+									class="absolute bottom-4 left-4 h-10 w-10 animate-pulse rounded-bl-2xl border-b-[3px] border-l-[3px] border-foreground/40"
+								></div>
+								<div
+									class="absolute right-4 bottom-4 h-10 w-10 animate-pulse rounded-br-2xl border-r-[3px] border-b-[3px] border-foreground/40"
+								></div>
+							{/if}
+							{#if scanState === 'scanning'}
+								<div
+									class="absolute top-4 left-4 h-10 w-10 rounded-tl-2xl border-t-[3px] border-l-[3px] border-emerald-500"
+								></div>
+								<div
+									class="absolute top-4 right-4 h-10 w-10 rounded-tr-2xl border-t-[3px] border-r-[3px] border-emerald-500"
+								></div>
+								<div
+									class="absolute bottom-4 left-4 h-10 w-10 rounded-bl-2xl border-b-[3px] border-l-[3px] border-emerald-500"
+								></div>
+								<div
+									class="absolute right-4 bottom-4 h-10 w-10 rounded-br-2xl border-r-[3px] border-b-[3px] border-emerald-500"
+								></div>
+							{/if}
+						</div>
+
+						{#if scanState === 'idle'}
+							<button
+								onclick={startCamera}
+								class="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-[12px] font-bold text-background transition-all active:scale-[0.98]"
+							>
+								<ScanLine size={14} strokeWidth={2.5} /> Scan Counter QR
+							</button>
+						{:else if scanState === 'starting'}
+							<p
+								class="flex w-full items-center justify-center gap-2 rounded-full bg-muted py-3 text-[12px] font-bold text-foreground transition-all"
+							>
+								<Loader2 size={14} strokeWidth={2.5} class="animate-spin" /> Accessing Camera
 							</p>
+						{:else if scanState === 'scanning'}
+							<button
+								onclick={resetScan}
+								class="w-full rounded-full border border-muted/50 bg-card py-3 text-[12px] font-bold text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
+							>
+								Cancel Scan
+							</button>
 						{/if}
 					</div>
-					<span class="font-mono text-[24px] font-bold tracking-tight text-foreground tabular-nums">
-						{formatCurrencyINR(total)}
-					</span>
+					<div class="flex items-start gap-2 rounded-2xl bg-amber-400/10 px-4 py-3 text-amber-600">
+						<span class="text-[12px] leading-relaxed font-medium">
+							<strong class="font-mono font-bold"
+								>{formatCurrencyINR(appState.activeTicket.total)}</strong
+							> will be deducted from your wallet only when you scan the counter QR and collect your order.
+						</span>
+					</div>
+				{:else if scanState === 'error'}
+					<div
+						class="flex flex-col items-center gap-3 rounded-[20px] border border-destructive/25 bg-destructive/5 p-4 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					>
+						<div class="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/20">
+							<X size={22} class="text-destructive" strokeWidth={2.5} />
+						</div>
+						<div class="text-center">
+							<h3 class="text-[15px] font-bold text-foreground">Scan Failed</h3>
+							<p class="mt-0.5 text-[10px] font-bold tracking-widest text-foreground/60 uppercase">
+								{manualError || 'Could not read the counter QR'}
+							</p>
+						</div>
+						<button
+							onclick={resetScan}
+							class="w-full rounded-full border border-muted/50 bg-card py-3 text-[12px] font-bold text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
+						>
+							Try Again
+						</button>
+					</div>
+				{/if}
+
+				{#if scanState !== 'success' && fallbackState !== 'confirmed'}
+					<div
+						class="overflow-hidden rounded-[20px] border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					>
+						{#if fallbackState === 'hidden'}
+							<button
+								onclick={openFallback}
+								class="flex w-full items-center justify-between px-4 py-3 transition-colors active:bg-muted/30"
+							>
+								<div class="flex items-center gap-2">
+									<Hash size={14} strokeWidth={2.5} class="text-foreground/40" />
+									<span class="text-[10px] font-bold tracking-widest text-foreground/60 uppercase">
+										Scanner not working?
+									</span>
+								</div>
+								<span class="text-[10px] font-bold tracking-widest text-primary uppercase">
+									Manual entry →
+								</span>
+							</button>
+						{:else if fallbackState === 'open'}
+							<div class="space-y-3 px-4 py-4">
+								<div class="flex items-center justify-between">
+									<span class="text-[10px] font-bold tracking-widest text-foreground/60 uppercase">
+										Manual Confirmation
+									</span>
+									<button
+										onclick={closeFallback}
+										class="flex h-7 w-7 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
+									>
+										<X size={13} strokeWidth={2.5} />
+									</button>
+								</div>
+								<p class="text-[12px] leading-relaxed font-medium text-foreground/60">
+									Tell the counter staff your order number. They will enter it on their terminal to
+									confirm your order.
+								</p>
+								<div class="rounded-[14px] bg-muted/20 px-3 py-3 text-center">
+									<p
+										class="mb-0.5 text-[9px] font-bold tracking-[0.15em] text-foreground/50 uppercase"
+									>
+										Your Order ID
+									</p>
+									<p class="text-[22px] font-black tracking-widest text-foreground uppercase">
+										{appState.activeTicket.id}
+									</p>
+								</div>
+								<div class="h-px bg-muted/20"></div>
+								<div class="space-y-1.5">
+									<p
+										class="block text-[9px] font-bold tracking-widest text-foreground/60 uppercase"
+									>
+										Staff: enter order ID to confirm
+									</p>
+									<input
+										type="text"
+										bind:value={manualOrderId}
+										placeholder={appState.activeTicket.id}
+										class="w-full rounded-xl border border-muted/40 bg-card px-3 py-2.5 text-[13px] font-bold tracking-wider text-foreground uppercase transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/50"
+										oninput={() => (manualError = '')}
+									/>
+									{#if manualError}
+										<p class="text-[10px] font-bold tracking-widest text-destructive uppercase">
+											{manualError}
+										</p>
+									{/if}
+								</div>
+								<button
+									onclick={submitManual}
+									class="mt-1 w-full rounded-full bg-primary py-3 text-[12px] font-bold text-background transition-all active:scale-[0.98]"
+								>
+									Confirm Order
+								</button>
+							</div>
+						{:else if fallbackState === 'submitting'}
+							<div class="flex items-center justify-center gap-2.5 px-4 py-4">
+								<Loader2 size={14} strokeWidth={2.5} class="animate-spin text-foreground/50" />
+								<span class="text-[10px] font-bold tracking-widest text-foreground/60 uppercase">
+									Confirming…
+								</span>
+							</div>
+						{:else if fallbackState === 'confirmed'}
+							<div class="flex items-center justify-center gap-2 bg-emerald-500/10 px-4 py-4">
+								<CheckCircle size={14} strokeWidth={2.5} class="text-emerald-500" />
+								<span class="text-[10px] font-bold tracking-widest text-emerald-500 uppercase">
+									Confirmed by staff
+								</span>
+							</div>
+						{/if}
+					</div>
+				{/if}
+
+				<div
+					class="overflow-hidden rounded-[20px] border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+				>
+					<div
+						class="flex items-center justify-between border-b border-muted/20 bg-muted/10 px-4 py-2.5"
+					>
+						<span class="text-[9px] font-bold tracking-[0.15em] text-foreground/50 uppercase">
+							Receipt
+						</span>
+						<span class="text-[11px] font-bold text-foreground/50">{appState.activeTicket.id}</span>
+					</div>
+					<div class="divide-y divide-muted/20 px-4">
+						{#each appState.activeTicket.items as item (item.menuItem.id)}
+							<div class="flex items-center justify-between py-2.5">
+								<div class="flex items-center gap-2.5">
+									<span
+										class="flex h-5 w-5 items-center justify-center rounded-md bg-muted text-[11px] font-bold text-foreground/70"
+									>
+										{item.quantity}
+									</span>
+									<div class="flex flex-col">
+										<span class="text-[13px] font-semibold text-foreground">
+											{item.menuItem.name}
+										</span>
+										<span class="text-[9px] font-bold tracking-widest text-foreground/50 uppercase">
+											{item.menuItem.category}
+										</span>
+									</div>
+								</div>
+								<span class="font-mono text-[13px] font-bold text-foreground">
+									{formatCurrencyINR(item.menuItem.price * item.quantity)}
+								</span>
+							</div>
+						{/each}
+					</div>
+					<div
+						class="flex items-center justify-between border-t border-muted/20 bg-muted/20 px-4 py-3"
+					>
+						<span class="text-[11px] font-bold text-foreground/60">Due on collection</span>
+						<span class="font-mono text-[16px] font-bold text-foreground"
+							>{formatCurrencyINR(appState.activeTicket.total)}</span
+						>
+					</div>
 				</div>
 
-				<div class="px-4 pb-4">
+				<div class="pt-2">
 					<button
-						disabled={insufficientBalance}
-						onclick={handleCheckout}
-						class="w-full rounded-full py-3.5 text-[15px] font-bold tracking-wide transition-all active:scale-[0.98]
-						{insufficientBalance
-							? 'cursor-not-allowed bg-muted text-foreground/30'
-							: 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'}"
+						onclick={cancelOrder}
+						class="w-full rounded-full border border-destructive/25 bg-card py-3.5 text-[13px] font-bold text-destructive transition-all active:scale-[0.98]"
 					>
-						{#if insufficientBalance}
-							Insufficient Balance
-						{:else}
-							Checkout · {itemCount} {itemCount === 1 ? 'item' : 'items'}
-						{/if}
+						Cancel Order
 					</button>
 				</div>
 			</div>
-		</div>
-	{/if}
+		{:else}
+			<div
+				class="mt-6 flex flex-1 flex-col items-center justify-center gap-3 rounded-3xl border border-muted/25 bg-card p-8 text-center shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+			>
+				<div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
+					<QrCode size={24} strokeWidth={2} class="text-foreground/50" />
+				</div>
+				<div>
+					<h3 class="text-[16px] font-bold text-foreground">No Active Orders</h3>
+					<p class="mt-1 text-[13px] font-medium text-foreground/50">
+						Place an order from the menu to generate a ticket.
+					</p>
+				</div>
+				<a
+					href={resolve('/menu')}
+					class="mt-1 rounded-full bg-primary px-5 py-2.5 text-[12px] font-bold text-background transition-all active:scale-95"
+				>
+					Browse Menu
+				</a>
+			</div>
+		{/if}
+	</div>
 </div>
