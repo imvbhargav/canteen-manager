@@ -11,7 +11,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import AppLogo from '$lib/components/AppLogo.svelte';
 
 	interface SavedProfile {
@@ -161,8 +161,11 @@
 
 	// Auto-submit when PIN reaches 4 digits
 	$effect(() => {
-		if (pin.length === 4 && identifier.length >= 2 && !isLoading) {
-			executeLogin();
+		if (pin.length === 4 && identifier.length >= 2) {
+			// Untrack isLoading so it doesn't re-trigger the effect
+			untrack(() => {
+				if (!isLoading) executeLogin();
+			});
 		}
 	});
 
