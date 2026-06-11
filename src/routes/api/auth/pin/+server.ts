@@ -37,7 +37,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		// Verify the current PIN
 		const isValid = verifyPin(currentPin, user.pinHash);
 
-		if (isValid) {
+		if (!isValid) {
 			return json({ success: false, error: 'Incorrect current PIN' }, { status: 403 });
 		}
 
