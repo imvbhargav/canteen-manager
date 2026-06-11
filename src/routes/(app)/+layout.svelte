@@ -151,7 +151,7 @@
 
 	{#if showInstallBanner}
 		<div
-			class="animate-in slide-in-from-bottom-4 fade-in absolute right-5 bottom-18 left-5 z-50 duration-300"
+			class="animate-in slide-in-from-bottom-4 fade-in absolute right-5 bottom-2 left-5 z-50 duration-300"
 		>
 			<div
 				class="flex items-center justify-between rounded-3xl border border-muted/30 bg-card p-4 shadow-[0_8px_32px_rgba(0,0,0,0.12)]"
