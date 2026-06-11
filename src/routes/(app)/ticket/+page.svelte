@@ -9,7 +9,8 @@
 		X,
 		Hash,
 		ShoppingBag,
-		Loader2
+		Loader2,
+		Home
 	} from 'lucide-svelte';
 	import jsQR from 'jsqr';
 	import type { QRCode } from 'jsqr';
@@ -23,6 +24,10 @@
 	let fallbackState: FallbackState = $state('hidden');
 	let manualOrderId: string = $state('');
 	let manualError: string = $state('');
+
+	// Snapshot of completed ticket so we can show it after activeTicket is cleared
+	let completedTicket: typeof appState.activeTicket = $state(null);
+	let completedTotal: number = $state(0);
 
 	let videoEl: HTMLVideoElement | undefined = $state();
 	let canvasEl: HTMLCanvasElement | undefined = $state();
@@ -163,10 +168,15 @@
 				const result: { success: boolean; error?: string } = await response.json();
 
 				if (result.success) {
+					// Snapshot the ticket before clearing it so we can show it on the success screen
+					completedTicket = { ...appState.activeTicket };
+					completedTotal = appState.activeTicket.total;
+
 					appState.wallet.balance -= appState.activeTicket.total;
 					appState.activeTicket = { ...appState.activeTicket, status: 'COMPLETED' };
 					appState.activeTicket = null;
-					goto(resolve('/'));
+
+					// Stay on this page — scanState is already 'success'
 				} else {
 					scanState = 'error';
 					manualError = result.error || 'Checkout failed. Please try again.';
@@ -215,7 +225,83 @@
 	</header>
 
 	<div class="px-5 pt-1 pb-8">
-		{#if appState.activeTicket}
+		{#if scanState === 'success' && completedTicket}
+			<!-- ── Success screen: show completed receipt ── -->
+			<div class="space-y-3">
+				<div
+					class="flex flex-col items-center gap-3 rounded-[20px] border border-emerald-500/25 bg-emerald-500/5 p-5 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+				>
+					<div class="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20">
+						<CheckCircle size={26} class="text-emerald-500" strokeWidth={2.5} />
+					</div>
+					<div class="text-center">
+						<h3 class="text-[17px] font-bold text-foreground">Order Collected!</h3>
+						<p
+							class="mt-1 font-mono text-[11px] font-bold tracking-widest text-emerald-600 uppercase"
+						>
+							{formatCurrencyINR(completedTotal)} deducted from wallet
+						</p>
+					</div>
+				</div>
+
+				<!-- Completed receipt -->
+				<div
+					class="overflow-hidden rounded-[20px] border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+				>
+					<div
+						class="flex items-center justify-between border-b border-muted/20 bg-muted/10 px-4 py-2.5"
+					>
+						<span class="text-[9px] font-bold tracking-[0.15em] text-foreground/50 uppercase">
+							Receipt
+						</span>
+						<span class="text-[11px] font-bold text-foreground/50">{completedTicket.id}</span>
+					</div>
+					<div class="divide-y divide-muted/20 px-4">
+						{#each completedTicket.items as item (item.menuItem.id)}
+							<div class="flex items-center justify-between py-2.5">
+								<div class="flex items-center gap-2.5">
+									<span
+										class="flex h-5 w-5 items-center justify-center rounded-md bg-muted text-[11px] font-bold text-foreground/70"
+									>
+										{item.quantity}
+									</span>
+									<div class="flex flex-col">
+										<span class="text-[13px] font-semibold text-foreground">
+											{item.menuItem.name}
+										</span>
+										<span class="text-[9px] font-bold tracking-widest text-foreground/50 uppercase">
+											{item.menuItem.category}
+										</span>
+									</div>
+								</div>
+								<span class="font-mono text-[13px] font-bold text-foreground">
+									{formatCurrencyINR(item.menuItem.price * item.quantity)}
+								</span>
+							</div>
+						{/each}
+					</div>
+					<div
+						class="flex items-center justify-between border-t border-muted/20 bg-muted/20 px-4 py-3"
+					>
+						<span class="text-[11px] font-bold text-foreground/60">Total paid</span>
+						<span class="font-mono text-[16px] font-bold text-foreground"
+							>{formatCurrencyINR(completedTotal)}</span
+						>
+					</div>
+				</div>
+
+				<!-- Back to Home button -->
+				<div class="pt-2">
+					<a
+						href={resolve('/')}
+						class="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3.5 text-[13px] font-bold text-background transition-all active:scale-[0.98]"
+					>
+						<Home size={15} strokeWidth={2.5} />
+						Back to Home
+					</a>
+				</div>
+			</div>
+		{:else if appState.activeTicket}
 			<div class="space-y-3">
 				{#if scanState === 'idle' || scanState === 'starting' || scanState === 'scanning'}
 					<div
@@ -311,22 +397,6 @@
 								>{formatCurrencyINR(appState.activeTicket.total)}</strong
 							> will be deducted from your wallet only when you scan the counter QR and collect your order.
 						</span>
-					</div>
-				{:else if scanState === 'success'}
-					<div
-						class="flex flex-col items-center gap-3 rounded-[20px] border border-emerald-500/25 bg-emerald-500/5 p-4 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
-					>
-						<div class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20">
-							<CheckCircle size={22} class="text-emerald-500" strokeWidth={2.5} />
-						</div>
-						<div class="text-center">
-							<h3 class="text-[15px] font-bold text-foreground">Order Collected</h3>
-							<p
-								class="mt-0.5 font-mono text-[10px] font-bold tracking-widest text-emerald-500 uppercase"
-							>
-								{formatCurrencyINR(appState.activeTicket.total)} deducted from wallet
-							</p>
-						</div>
 					</div>
 				{:else if scanState === 'error'}
 					<div
