@@ -159,6 +159,13 @@
 			</button>
 		</header>
 
+		<div class="px-6 py-3">
+			<h2 class="font-site-name text-3xl font-black">
+				Welcome <span class="text-primary">{appState.wallet.name.split(' ')[0]}!</span> 👋
+			</h2>
+			<p class="px-1 text-sm text-foreground/50">{appState.wallet.studentId}</p>
+		</div>
+
 		<div class="px-5 pt-5">
 			{#if appState.activeTicket}
 				<div
@@ -350,7 +357,7 @@
 						{formatCurrencyINR(appState.wallet.balance)}
 					</p>
 					<div class="mt-4 flex items-center justify-between">
-						<p class="text-[12px] font-medium text-background">{appState.wallet.name}</p>
+						<p class="font-black text-background">{appState.wallet.name}</p>
 						<a
 							href={resolve('/topup')}
 							class="flex items-center gap-1.5 rounded-full bg-background/80 px-4 py-2 text-[13px] font-black text-primary ring-4 ring-accent/25 backdrop-blur-md transition-all active:scale-95"

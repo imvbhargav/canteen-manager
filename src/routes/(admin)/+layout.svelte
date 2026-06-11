@@ -2,7 +2,7 @@
 	import '../layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/stores';
-	import { UtensilsCrossed, /* Wallet, */ QrCode, WifiOff, Wallet } from 'lucide-svelte';
+	import { UtensilsCrossed, WifiOff, Users, ReceiptIndianRupee } from 'lucide-svelte';
 	import { resolve } from '$app/paths';
 	import { onMount, type Snippet } from 'svelte';
 
@@ -42,8 +42,8 @@
 
 	const adminNavItems = [
 		{ path: resolve('/admin'), icon: UtensilsCrossed, label: 'Menu' },
-		{ path: resolve('/admin/wallet'), icon: Wallet, label: 'Wallet' },
-		{ path: resolve('/admin/counters'), icon: QrCode, label: 'Counters' }
+		{ path: resolve('/admin/counters'), icon: ReceiptIndianRupee, label: 'Counters' },
+		{ path: resolve('/admin/users'), icon: Users, label: 'Users' }
 	];
 
 	let currentPath = $derived($page.url.pathname);

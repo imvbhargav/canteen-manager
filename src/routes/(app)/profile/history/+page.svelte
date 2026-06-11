@@ -13,59 +13,87 @@
 	};
 
 	let transactions: Transaction[] = $state([]);
-	let isLoadingHistory = $state(true);
+	let stats = $state({ totalAdded: 0, totalSpent: 0 });
 
-	let totalAdded = $derived(
-		transactions.reduce((sum, tx) => (tx.type === 'credit' ? sum + tx.amount : sum), 0)
-	);
-	let totalSpent = $derived(
-		transactions.reduce((sum, tx) => (tx.type === 'debit' ? sum + tx.amount : sum), 0)
-	);
+	let isLoadingHistory = $state(true);
+	let isLoadingMore = $state(false);
+
+	let nextCursor: string | null = $state(null);
+	let hasNextPage = $state(false);
+
 	let remaining = $derived(appState.wallet?.balance || 0);
 
-	$effect(() => {
-		fetch('/api/wallet/history')
-			.then((res) => res.json())
-			.then((data) => {
-				if (data.success) {
-					transactions = data.data.map(
-						(tx: {
-							id: string;
-							type: string;
-							description: string;
-							createdAt: Date;
-							amount: number;
-						}) => {
-							const d = new Date(tx.createdAt);
-							const dateStr = d.toLocaleDateString(undefined, {
-								month: 'short',
-								day: 'numeric',
-								year: 'numeric'
-							});
-							const timeStr = d.toLocaleTimeString(undefined, {
-								hour: 'numeric',
-								minute: '2-digit'
-							});
+	async function fetchHistory(cursor: string | null = null) {
+		const url = new URL('/api/wallet/history', window.location.origin);
+		url.searchParams.set('limit', '15');
+		if (cursor) url.searchParams.set('cursor', cursor);
 
-							return {
-								id: tx.id,
-								type: tx.type === 'CREDIT' ? 'credit' : 'debit',
-								title: tx.description,
-								date: `${dateStr} · ${timeStr}`,
-								amount: Number(tx.amount)
-							};
-						}
-					);
+		try {
+			const res = await fetch(url.toString());
+			const data = await res.json();
+
+			if (data.success) {
+				const formattedTx = data.data.transactions.map(
+					(tx: {
+						id: string;
+						type: string;
+						description: string;
+						createdAt: Date | string;
+						amount: number;
+					}) => {
+						const d = new Date(tx.createdAt);
+						const dateStr = d.toLocaleDateString(undefined, {
+							month: 'short',
+							day: 'numeric',
+							year: 'numeric'
+						});
+						const timeStr = d.toLocaleTimeString(undefined, {
+							hour: 'numeric',
+							minute: '2-digit'
+						});
+
+						return {
+							id: tx.id,
+							type: tx.type === 'CREDIT' ? 'credit' : 'debit',
+							title: tx.description,
+							date: `${dateStr} · ${timeStr}`,
+							amount: Number(tx.amount)
+						};
+					}
+				);
+
+				if (cursor) {
+					transactions = [...transactions, ...formattedTx];
+				} else {
+					transactions = formattedTx;
+					stats = data.data.stats;
 				}
-			})
-			.catch((err) => console.error(err))
-			.finally(() => (isLoadingHistory = false));
+
+				nextCursor = data.data.pagination.nextCursor;
+				hasNextPage = data.data.pagination.hasNextPage;
+			}
+		} catch (err) {
+			console.error('Failed to fetch history:', err);
+		}
+	}
+
+	$effect(() => {
+		isLoadingHistory = true;
+		fetchHistory().finally(() => (isLoadingHistory = false));
 	});
+
+	function loadMore() {
+		if (!nextCursor || isLoadingMore) return;
+		isLoadingMore = true;
+		fetchHistory(nextCursor).finally(() => (isLoadingMore = false));
+	}
 </script>
 
 <svelte:head><title>History | MunchUp</title></svelte:head>
 
-<div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
+<div
+	class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background pb-10 duration-300"
+>
 	<header
 		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
 	>
@@ -82,7 +110,6 @@
 	</header>
 
 	<div class="space-y-5 px-5 pt-1">
-		<!-- ── Summary Card ── -->
 		<div
 			class="overflow-hidden rounded-3xl border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
 		>
@@ -103,7 +130,7 @@
 						<div class="mx-auto mt-1.5 h-5 w-16 animate-pulse rounded-full bg-muted/50"></div>
 					{:else}
 						<p class="mt-0.5 font-mono text-[16px] font-bold text-foreground">
-							{formatCurrencyINR(totalAdded)}
+							{formatCurrencyINR(stats.totalAdded)}
 						</p>
 					{/if}
 				</div>
@@ -115,14 +142,13 @@
 						<div class="mx-auto mt-1.5 h-5 w-16 animate-pulse rounded-full bg-muted/50"></div>
 					{:else}
 						<p class="mt-0.5 font-mono text-[16px] font-bold text-foreground">
-							{formatCurrencyINR(totalSpent)}
+							{formatCurrencyINR(stats.totalSpent)}
 						</p>
 					{/if}
 				</div>
 			</div>
 		</div>
 
-		<!-- ── Transactions List ── -->
 		<div>
 			<h3 class="mb-3 px-1 text-[13px] font-bold tracking-wider text-foreground/40 uppercase">
 				Recent Transactions
@@ -131,7 +157,7 @@
 				class="overflow-hidden rounded-3xl border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
 			>
 				<div class="divide-y divide-muted/20">
-					{#if isLoadingHistory}
+					{#if isLoadingHistory && transactions.length === 0}
 						{#each [1, 2, 3, 4, 5] as i (i)}
 							<div class="flex animate-pulse items-center justify-between px-4 py-4">
 								<div class="flex items-center gap-3">
@@ -191,11 +217,24 @@
 					{/if}
 				</div>
 			</div>
-			<p
-				class="mt-4 text-center text-[10px] font-bold tracking-[0.15em] text-foreground/30 uppercase"
-			>
-				End of recent history
-			</p>
+
+			{#if hasNextPage}
+				<div class="mt-4 text-center">
+					<button
+						onclick={loadMore}
+						disabled={isLoadingMore}
+						class="rounded-full bg-muted/50 px-5 py-2 text-[12px] font-bold text-foreground transition-all active:scale-95 disabled:opacity-50"
+					>
+						{isLoadingMore ? 'Loading...' : 'Load More'}
+					</button>
+				</div>
+			{:else if !isLoadingHistory && transactions.length > 0}
+				<p
+					class="mt-4 text-center text-[10px] font-bold tracking-[0.15em] text-foreground/30 uppercase"
+				>
+					End of recent history
+				</p>
+			{/if}
 		</div>
 	</div>
 </div>

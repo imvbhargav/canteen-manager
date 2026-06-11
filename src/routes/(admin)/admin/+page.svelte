@@ -32,6 +32,11 @@
 	let searchQuery: string = $state('');
 	let showArchived: boolean = $state(false);
 
+	// New state for form visibility and category filtering
+	let showAddForm: boolean = $state(false);
+	let selectedCategory: string = $state('All');
+	const filterCategories: string[] = ['All', 'Breakfast', 'Lunch', 'Snacks', 'Beverages'];
+
 	let processingItemId: string | null = $state(null);
 
 	let filteredMenu: MenuItem[] = $derived(
@@ -40,7 +45,10 @@
 				item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				item.category.toLowerCase().includes(searchQuery.toLowerCase());
 			const matchesArchiveStatus: boolean = showArchived ? true : !item.isArchived;
-			return matchesSearch && matchesArchiveStatus;
+			const matchesCategory: boolean =
+				selectedCategory === 'All' || item.category === selectedCategory;
+
+			return matchesSearch && matchesArchiveStatus && matchesCategory;
 		})
 	);
 
@@ -120,7 +128,10 @@
 				menuSuccessMsg = 'Item published';
 				menuForm = { name: '', description: '', price: '', category: 'Breakfast', dietary: 'veg' };
 				await fetchMenuItems(false);
-				setTimeout(() => (menuSuccessMsg = ''), 3000);
+				setTimeout(() => {
+					menuSuccessMsg = '';
+					showAddForm = false; // Optionally auto-close the form on success
+				}, 1500);
 			}
 		} catch {
 			console.error('Failed to add item');
@@ -228,125 +239,133 @@
 	</header>
 
 	<div class="flex-1 space-y-6 px-5 pt-4">
-		<form
-			onsubmit={handleAddMenuItem}
-			class="space-y-4 rounded-3xl border border-muted/30 bg-card p-5 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
-		>
-			<div>
-				<label
-					for="name"
-					class="mb-2 block text-[10px] font-bold tracking-widest text-foreground/50 uppercase"
-					>Item Name</label
-				>
-				<input
-					id="name"
-					type="text"
-					bind:value={menuForm.name}
-					required
-					class="w-full rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3 text-[14px] font-bold text-foreground transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/50 focus:bg-card"
-					placeholder="e.g. Masala Dosa"
-				/>
-			</div>
+		<div class="flex items-center justify-between">
+			<h3 class="text-[17px] font-bold tracking-tight text-foreground">Menu Items</h3>
+			<button
+				onclick={() => (showAddForm = !showAddForm)}
+				class="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-bold transition-transform active:scale-[0.98] {showAddForm
+					? 'bg-muted/60 text-foreground'
+					: 'bg-primary text-background shadow-[0_4px_12px_rgba(0,0,0,0.1)]'}"
+			>
+				{#if showAddForm}
+					<X size={14} strokeWidth={2.5} /> Close Form
+				{:else}
+					<Plus size={14} strokeWidth={2.5} /> Add Item
+				{/if}
+			</button>
+		</div>
 
-			<div>
-				<label
-					for="desc"
-					class="mb-2 block text-[10px] font-bold tracking-widest text-foreground/50 uppercase"
-					>Description</label
-				>
-				<textarea
-					id="desc"
-					bind:value={menuForm.description}
-					required
-					rows="2"
-					class="w-full resize-none rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3 text-[13px] font-medium text-foreground transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/50 focus:bg-card"
-					placeholder="Brief description of the item..."
-				></textarea>
-			</div>
-
-			<div class="grid grid-cols-2 gap-4">
+		{#if showAddForm}
+			<form
+				onsubmit={handleAddMenuItem}
+				class="space-y-4 rounded-3xl border border-muted/30 bg-card p-5 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+			>
 				<div>
 					<label
-						for="price"
+						for="name"
 						class="mb-2 block text-[10px] font-bold tracking-widest text-foreground/50 uppercase"
-						>Price (₹)</label
+						>Item Name</label
 					>
 					<input
-						id="price"
-						type="number"
-						min="0"
-						step="0.01"
-						bind:value={menuForm.price}
+						id="name"
+						type="text"
+						bind:value={menuForm.name}
 						required
 						class="w-full rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3 text-[14px] font-bold text-foreground transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/50 focus:bg-card"
-						placeholder="0.00"
+						placeholder="e.g. Masala Dosa"
 					/>
 				</div>
 
 				<div>
 					<label
-						for="diet"
+						for="desc"
 						class="mb-2 block text-[10px] font-bold tracking-widest text-foreground/50 uppercase"
-						>Dietary</label
+						>Description</label
+					>
+					<textarea
+						id="desc"
+						bind:value={menuForm.description}
+						required
+						rows="2"
+						class="w-full resize-none rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3 text-[13px] font-medium text-foreground transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/50 focus:bg-card"
+						placeholder="Brief description of the item..."
+					></textarea>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label
+							for="price"
+							class="mb-2 block text-[10px] font-bold tracking-widest text-foreground/50 uppercase"
+							>Price (₹)</label
+						>
+						<input
+							id="price"
+							type="number"
+							min="0"
+							step="0.01"
+							bind:value={menuForm.price}
+							required
+							class="w-full rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3 text-[14px] font-bold text-foreground transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/50 focus:bg-card"
+							placeholder="0.00"
+						/>
+					</div>
+
+					<div>
+						<label
+							for="diet"
+							class="mb-2 block text-[10px] font-bold tracking-widest text-foreground/50 uppercase"
+							>Dietary</label
+						>
+						<select
+							disabled
+							id="diet"
+							bind:value={menuForm.dietary}
+							class="w-full appearance-none rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3 text-[13px] font-bold text-foreground opacity-70 transition-colors outline-none"
+						>
+							<option value="veg">Vegetarian</option>
+							<option value="non-veg">Non-Vegetarian</option>
+						</select>
+					</div>
+				</div>
+
+				<div>
+					<label
+						for="category"
+						class="mb-2 block text-[10px] font-bold tracking-widest text-foreground/50 uppercase"
+						>Category</label
 					>
 					<select
-						disabled
-						id="diet"
-						bind:value={menuForm.dietary}
-						class="w-full appearance-none rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3 text-[13px] font-bold text-foreground opacity-70 transition-colors outline-none"
+						id="category"
+						bind:value={menuForm.category}
+						class="w-full appearance-none rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3 text-[13px] font-bold text-foreground transition-colors outline-none focus:border-foreground/50 focus:bg-card"
 					>
-						<option value="veg">Vegetarian</option>
-						<option value="non-veg">Non-Vegetarian</option>
+						<option value="Breakfast">Breakfast</option>
+						<option value="Lunch">Lunch</option>
+						<option value="Snacks">Snacks</option>
+						<option value="Beverages">Beverages</option>
 					</select>
 				</div>
-			</div>
 
-			<div>
-				<label
-					for="category"
-					class="mb-2 block text-[10px] font-bold tracking-widest text-foreground/50 uppercase"
-					>Category</label
+				<button
+					type="submit"
+					disabled={isMenuSubmitting}
+					class="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3.5 text-[13px] font-bold text-background transition-transform active:scale-[0.98] disabled:opacity-50"
 				>
-				<select
-					id="category"
-					bind:value={menuForm.category}
-					class="w-full appearance-none rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3 text-[13px] font-bold text-foreground transition-colors outline-none focus:border-foreground/50 focus:bg-card"
-				>
-					<option value="Breakfast">Breakfast</option>
-					<option value="Lunch">Lunch</option>
-					<option value="Snacks">Snacks</option>
-					<option value="Beverages">Beverages</option>
-				</select>
-			</div>
+					{#if isMenuSubmitting}
+						<Loader2 size={16} strokeWidth={2.5} class="animate-spin" /> Publishing...
+					{:else if menuSuccessMsg}
+						<CheckCircle2 size={16} strokeWidth={2.5} class="text-emerald-400" /> {menuSuccessMsg}
+					{:else}
+						<Plus size={16} strokeWidth={2.5} /> Publish to Menu
+					{/if}
+				</button>
+			</form>
 
-			<button
-				type="submit"
-				disabled={isMenuSubmitting}
-				class="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3.5 text-[13px] font-bold text-background transition-transform active:scale-[0.98] disabled:opacity-50"
-			>
-				{#if isMenuSubmitting}
-					<Loader2 size={16} strokeWidth={2.5} class="animate-spin" /> Publishing...
-				{:else if menuSuccessMsg}
-					<CheckCircle2 size={16} strokeWidth={2.5} class="text-emerald-400" /> {menuSuccessMsg}
-				{:else}
-					<Plus size={16} strokeWidth={2.5} /> Publish to Menu
-				{/if}
-			</button>
-		</form>
-
-		<div class="h-px bg-muted/30"></div>
+			<div class="h-px bg-muted/30"></div>
+		{/if}
 
 		<div class="space-y-4">
-			<div class="flex items-center justify-between">
-				<h3 class="text-[17px] font-bold tracking-tight text-foreground">Menu Items</h3>
-				<label
-					class="flex cursor-pointer items-center gap-2 text-[11px] font-bold tracking-widest text-foreground/50 uppercase transition-colors hover:text-foreground"
-				>
-					<input type="checkbox" bind:checked={showArchived} class="accent-foreground" />
-					Show Archived
-				</label>
-			</div>
-
 			<div class="relative">
 				<Search
 					class="absolute top-1/2 left-4 -translate-y-1/2 text-foreground/40"
@@ -361,7 +380,30 @@
 				/>
 			</div>
 
-			<div class="space-y-3">
+			<div class="flex items-center justify-between gap-4">
+				<div class="flex scrollbar-none gap-2 overflow-x-auto pb-1">
+					{#each filterCategories as cat (cat)}
+						<button
+							onclick={() => (selectedCategory = cat)}
+							class="rounded-full px-3.5 py-1.5 text-[11px] font-bold whitespace-nowrap transition-colors {selectedCategory ===
+							cat
+								? 'bg-foreground text-background'
+								: 'bg-muted/40 text-foreground/60 hover:bg-muted/60 hover:text-foreground'}"
+						>
+							{cat}
+						</button>
+					{/each}
+				</div>
+
+				<label
+					class="flex shrink-0 cursor-pointer items-center gap-2 pb-1 text-[11px] font-bold tracking-widest text-foreground/50 uppercase transition-colors hover:text-foreground"
+				>
+					<input type="checkbox" bind:checked={showArchived} class="accent-foreground" />
+					Archived
+				</label>
+			</div>
+
+			<div class="space-y-3 pb-10">
 				{#if isFetchingMenu}
 					{#each Array.from({ length: 4 }, (_, i) => i) as i (i)}
 						<div
@@ -380,7 +422,9 @@
 					{/each}
 				{:else if filteredMenu.length === 0}
 					<div class="rounded-2xl border border-muted/25 bg-card py-10 text-center">
-						<p class="text-[13px] font-medium text-foreground/40">No items found.</p>
+						<p class="text-[13px] font-medium text-foreground/40">
+							No items found in this category.
+						</p>
 					</div>
 				{:else}
 					{#each filteredMenu as item (item.id)}
