@@ -1,7 +1,7 @@
 import type { Handle } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { userSessions } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, gt } from 'drizzle-orm';
 import { hashSessionToken } from '$lib/server/auth';
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -19,7 +19,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		where: and(
 			eq(userSessions.tokenHash, tokenHash),
 			eq(userSessions.isRevoked, false),
-			eq(userSessions.expiresAt, new Date())
+			gt(userSessions.expiresAt, new Date())
 		),
 		with: {
 			user: {
