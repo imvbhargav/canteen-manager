@@ -584,14 +584,16 @@
 					</div>
 				</div>
 
-				<div class="pt-2">
-					<button
-						onclick={cancelOrder}
-						class="w-full rounded-full border border-destructive/25 bg-card py-3.5 text-[13px] font-bold text-destructive transition-all active:scale-[0.98]"
-					>
-						Cancel Order
-					</button>
-				</div>
+				{#if scanState !== 'processing'}
+					<div class="pt-2">
+						<button
+							onclick={cancelOrder}
+							class="w-full rounded-full border border-destructive/25 bg-card py-3.5 text-[13px] font-bold text-destructive transition-all active:scale-[0.98]"
+						>
+							Cancel Order
+						</button>
+					</div>
+				{/if}
 			</div>
 		{:else}
 			<div
