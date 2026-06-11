@@ -101,10 +101,10 @@
 
 	{#if appState.wallet}
 		<div class="space-y-4 px-5 pt-1">
-			<div class="rounded-4xl bg-primary p-1">
+			<div class="rounded-4xl bg-background p-1 ring-3 ring-primary/50">
 				<!-- User Info Card -->
 				<div
-					class="flex items-center gap-4 rounded-t-4xl border border-muted/30 bg-card p-4 pb-10 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					class="flex items-center gap-4 rounded-t-4xl border border-muted/30 bg-card p-4 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
 				>
 					<div
 						class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-muted/50 text-[20px] font-black text-foreground/60"
@@ -132,7 +132,7 @@
 
 				<!-- Wallet Card -->
 				<div
-					class="relative -mt-6 overflow-hidden rounded-[28px] bg-linear-to-br from-primary to-accent px-6 py-5 shadow-[0_4px_24px_rgba(15,37,68,0.18)]"
+					class="relative overflow-hidden rounded-[28px] bg-linear-to-br from-primary to-accent px-6 py-5 shadow-[0_4px_24px_rgba(15,37,68,0.18)]"
 				>
 					<div
 						class="pointer-events-none absolute -top-8 -right-8 h-36 w-36 rounded-full bg-white/5"
