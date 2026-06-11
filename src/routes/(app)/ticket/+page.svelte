@@ -17,7 +17,7 @@
 	import { resolve } from '$app/paths';
 	import { formatCurrencyINR } from '$lib';
 
-	type ScanState = 'idle' | 'starting' | 'scanning' | 'success' | 'error';
+	type ScanState = 'idle' | 'starting' | 'scanning' | 'processing' | 'success' | 'error';
 	type FallbackState = 'hidden' | 'open' | 'submitting' | 'confirmed';
 
 	let scanState: ScanState = $state('idle');
@@ -25,7 +25,6 @@
 	let manualOrderId: string = $state('');
 	let manualError: string = $state('');
 
-	// Snapshot of completed ticket so we can show it after activeTicket is cleared
 	let completedTicket: typeof appState.activeTicket = $state(null);
 	let completedTotal: number = $state(0);
 	let completedTicketRef: string = $state('');
@@ -148,6 +147,9 @@
 
 	async function handleCollected(securePayload: string): Promise<void> {
 		if (appState.activeTicket && appState.wallet) {
+			scanState = 'processing';
+			fallbackState = 'hidden';
+
 			try {
 				const payload: { id: string; quantity: number }[] = appState.activeTicket.items.map(
 					(i) => ({
@@ -178,7 +180,6 @@
 				} = await response.json();
 
 				if (result.success && result.data) {
-					// Snapshot the ticket before clearing it so we can show it on the success screen
 					completedTicket = { ...appState.activeTicket };
 					completedTotal = Number(result.data.totalAmount);
 					completedTicketRef = result.data.ticketReference;
@@ -186,12 +187,10 @@
 					appState.wallet.balance -= Number(result.data.totalAmount);
 					appState.activeTicket = null;
 
-					// Only transition to success AFTER the API confirms — this is what renders the success screen
 					scanState = 'success';
 				} else {
 					scanState = 'error';
 					manualError = result.error || 'Checkout failed. Please try again.';
-					fallbackState = 'hidden';
 				}
 			} catch (err: unknown) {
 				console.error(err);
@@ -237,7 +236,6 @@
 
 	<div class="px-5 pt-1 pb-8">
 		{#if scanState === 'success' && completedTicket}
-			<!-- ── Success screen: show completed receipt ── -->
 			<div class="space-y-3">
 				<div
 					class="flex flex-col items-center gap-3 rounded-[20px] border border-emerald-500/25 bg-emerald-500/5 p-5 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
@@ -255,7 +253,6 @@
 					</div>
 				</div>
 
-				<!-- Completed receipt -->
 				<div
 					class="overflow-hidden rounded-[20px] border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
 				>
@@ -301,7 +298,6 @@
 					</div>
 				</div>
 
-				<!-- Back to Home button -->
 				<div class="pt-2">
 					<a
 						href={resolve('/')}
@@ -314,7 +310,28 @@
 			</div>
 		{:else if appState.activeTicket}
 			<div class="space-y-3">
-				{#if scanState === 'idle' || scanState === 'starting' || scanState === 'scanning'}
+				{#if scanState === 'processing'}
+					<div
+						class="flex flex-col items-center justify-center gap-5 rounded-[20px] border border-primary/20 bg-primary/5 px-6 py-10 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					>
+						<div class="relative flex h-16 w-16 items-center justify-center">
+							<div
+								class="absolute inset-0 animate-ping rounded-full bg-primary/25 duration-1000"
+							></div>
+							<div
+								class="relative flex h-14 w-14 items-center justify-center rounded-full bg-primary/20"
+							>
+								<Loader2 size={28} class="animate-spin text-primary" strokeWidth={2.5} />
+							</div>
+						</div>
+						<div class="text-center">
+							<h3 class="text-[17px] font-bold text-foreground">Processing Payment</h3>
+							<p class="mt-1.5 text-[10px] font-bold tracking-widest text-primary/80 uppercase">
+								Please hold on
+							</p>
+						</div>
+					</div>
+				{:else if scanState === 'idle' || scanState === 'starting' || scanState === 'scanning'}
 					<div
 						class="flex flex-col items-center gap-3 rounded-[20px] border border-muted/30 bg-card p-4 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
 					>
@@ -431,7 +448,7 @@
 					</div>
 				{/if}
 
-				{#if scanState !== 'success' && fallbackState !== 'confirmed'}
+				{#if scanState !== 'success' && scanState !== 'processing' && fallbackState !== 'confirmed'}
 					<div
 						class="overflow-hidden rounded-[20px] border border-muted/30 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
 					>
