@@ -58,13 +58,14 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			userId: user.id,
 			deviceIdentifier,
 			tokenHash,
-			isRevoked: false
+			isRevoked: false,
+			expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
 		});
 
 		cookies.set('session_id', sessionToken, {
 			path: '/',
 			httpOnly: true,
-			sameSite: 'strict',
+			sameSite: 'lax',
 			secure: !dev,
 			maxAge: 60 * 60 * 24 * 7
 		});
