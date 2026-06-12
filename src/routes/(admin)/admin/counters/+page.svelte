@@ -277,7 +277,7 @@
 								<button
 									onclick={() => updateCounter(counter.id, { isActive: !counter.isActive })}
 									class="flex h-6.5 w-11 items-center rounded-full p-1 transition-colors duration-200 {counter.isActive
-										? 'bg-emerald-500'
+										? 'bg-primary'
 										: 'bg-muted/60'}"
 									aria-label="Toggle Counter Active Status"
 								>

@@ -182,7 +182,7 @@
 			</button>
 		</form>
 	</div>
-	<div class="mt-auto mb-4 rounded-2xl bg-accent/15 px-2 pt-4 pb-2 text-center">
+	<div class="mx-4 mt-auto rounded-2xl bg-accent/15 px-2 pt-4 pb-2 text-center">
 		<p class="mb-2 text-[10px] font-bold tracking-widest text-foreground/40 uppercase">
 			Alrady have an account?
 		</p>

@@ -113,12 +113,14 @@
 
 <svelte:head><title>Orders | MunchUp</title></svelte:head>
 
-<div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
+<div
+	class="animate-in fade-in absolute inset-0 z-20 flex flex-col overflow-y-auto bg-background duration-300"
+>
 	<header
 		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
 	>
 		<a
-			href={resolve('/profile')}
+			href={resolve('/')}
 			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
 		>
 			<ArrowLeft size={18} strokeWidth={2.5} />

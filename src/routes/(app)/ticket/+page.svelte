@@ -22,6 +22,8 @@
 
 	let scanState: ScanState = $state('idle');
 	let fallbackState: FallbackState = $state('hidden');
+
+	// Bind target for the staff-generated 6-digit OTP code sequence
 	let manualOrderId: string = $state('');
 	let manualError: string = $state('');
 
@@ -133,16 +135,59 @@
 		manualError = '';
 	}
 
-	function submitManual(): void {
-		if (manualOrderId.trim().toUpperCase() !== appState.activeTicket?.id) {
-			manualError = 'Order ID does not match — ask staff to verify';
+	// Process submission of staff code to your custom API route endpoint
+	async function submitManual(): Promise<void> {
+		const sanitizedOtp = manualOrderId.trim();
+		if (sanitizedOtp.length !== 6 || isNaN(Number(sanitizedOtp))) {
+			manualError = 'Please enter a valid 6-digit confirmation code.';
 			return;
 		}
+
+		if (!appState.activeTicket) return;
+
 		fallbackState = 'submitting';
-		setTimeout(async () => {
-			fallbackState = 'confirmed';
-			await handleCollected('MANUAL_FALLBACK');
-		}, 1500);
+		manualError = '';
+
+		try {
+			// Remap items from local storage application state store variables
+			const payloadItems = appState.activeTicket.items.map((i) => ({
+				menuItemId: i.menuItem.id,
+				quantity: i.quantity
+			}));
+
+			const response = await fetch('/api/qr/manual/verify', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					otpCode: sanitizedOtp,
+					items: payloadItems
+				})
+			});
+
+			const result = await response.json();
+
+			if (result.success && result.ticket) {
+				fallbackState = 'confirmed';
+
+				// Set structural receipt details to view template
+				completedTicket = { ...appState.activeTicket };
+				completedTotal = Number(result.ticket.total);
+				completedTicketRef = result.ticket.reference;
+
+				// Sync balance deductions and purge active staging items from store
+				if (appState.wallet) {
+					appState.wallet.balance -= completedTotal;
+				}
+				appState.activeTicket = null;
+				scanState = 'success';
+			} else {
+				fallbackState = 'open';
+				manualError = result.error || 'Verification failed. Double check with staff.';
+			}
+		} catch {
+			fallbackState = 'open';
+			manualError = 'Network error occurred during manual verification processing';
+		}
 	}
 
 	async function handleCollected(securePayload: string): Promise<void> {
@@ -151,12 +196,10 @@
 			fallbackState = 'hidden';
 
 			try {
-				const payload: { id: string; quantity: number }[] = appState.activeTicket.items.map(
-					(i) => ({
-						id: i.menuItem.id,
-						quantity: i.quantity
-					})
-				);
+				const payload = appState.activeTicket.items.map((i) => ({
+					id: i.menuItem.id,
+					quantity: i.quantity
+				}));
 
 				const response: Response = await fetch('/api/checkout', {
 					method: 'POST',
@@ -208,7 +251,9 @@
 
 <svelte:head><title>Your Ticket | MunchUp</title></svelte:head>
 
-<div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
+<div
+	class="animate-in fade-in absolute inset-0 z-20 flex flex-col overflow-y-auto bg-background duration-300"
+>
 	<header
 		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
 	>
@@ -480,32 +525,41 @@
 										<X size={13} strokeWidth={2.5} />
 									</button>
 								</div>
+
 								<p class="text-[12px] leading-relaxed font-medium text-foreground/60">
-									Tell the counter staff your order number. They will enter it on their terminal to
-									confirm your order.
+									Tell the counter staff your User ID. They will generate a verification OTP for you
+									to enter below.
 								</p>
+
 								<div class="rounded-[14px] bg-muted/20 px-3 py-3 text-center">
 									<p
 										class="mb-0.5 text-[9px] font-bold tracking-[0.15em] text-foreground/50 uppercase"
 									>
-										Your Order ID
+										Your User ID
 									</p>
 									<p class="text-[22px] font-black tracking-widest text-foreground uppercase">
-										{appState.activeTicket.id}
+										{appState.wallet?.rollNumber}
 									</p>
 								</div>
+
 								<div class="h-px bg-muted/20"></div>
+
 								<div class="space-y-1.5">
-									<p
+									<label
+										for="manualOtpInput"
 										class="block text-[9px] font-bold tracking-widest text-foreground/60 uppercase"
 									>
-										Staff: enter order ID to confirm
-									</p>
+										Enter Staff-Generated OTP
+									</label>
 									<input
+										id="manualOtpInput"
 										type="text"
+										inputmode="numeric"
+										pattern="[0-9]*"
+										placeholder="000000"
+										maxlength="6"
 										bind:value={manualOrderId}
-										placeholder={appState.activeTicket.id}
-										class="w-full rounded-xl border border-muted/40 bg-card px-3 py-2.5 text-[13px] font-bold tracking-wider text-foreground uppercase transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/50"
+										class="w-full rounded-xl border border-muted/40 bg-card px-3 py-2.5 text-center text-[14px] font-bold tracking-[0.25em] text-foreground uppercase transition-colors outline-none placeholder:tracking-normal placeholder:text-foreground/30 focus:border-foreground/50"
 										oninput={() => (manualError = '')}
 									/>
 									{#if manualError}
@@ -514,6 +568,7 @@
 										</p>
 									{/if}
 								</div>
+
 								<button
 									onclick={submitManual}
 									class="mt-1 w-full rounded-full bg-primary py-3 text-[12px] font-bold text-background transition-all active:scale-[0.98]"

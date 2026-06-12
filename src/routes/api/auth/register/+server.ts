@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			return json({ success: false, error: 'PIN must be exactly 4 digits' }, { status: 400 });
 		}
 
-		// 1. Check for existing user by Roll Number only to prevent duplicates
+		// Check for existing user by Roll Number only to prevent duplicates
 		const existingUser = await db.query.users.findFirst({
 			where: eq(users.rollNumber, rollNumber)
 		});
@@ -26,15 +26,14 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			return json({ success: false, error: 'Roll Number already registered' }, { status: 409 });
 		}
 
-		// 2. Generate readable Student ID based on the current year and roll number
-		// Example: STU-2026-10445
-		const currentYear = new Date().getFullYear();
-		const generatedStudentId = `STU-${currentYear}-${rollNumber}`;
+		// Generate readable Student ID based on the current year and roll number
+		// Example: NAMBMS10445
+		const generatedStudentId = `${name.slice(0, 3).toUpperCase()}${rollNumber.toUpperCase()}`;
 
-		// 3. Hash the PIN securely using the utility from auth.ts
+		// Hash the PIN securely using the utility from auth.ts
 		const hashedPin = hashPin(pin);
 
-		// 4. Create the user in the database inside a transaction
+		// Create the user in the database inside a transaction
 		const result = await db.transaction(async (tx) => {
 			const [newUser] = await tx
 				.insert(users)
@@ -48,7 +47,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 				})
 				.returning();
 
-			// 5. Generate and store session
+			// Generate and store session
 			const sessionToken = generateSessionToken();
 			const tokenHash = hashSessionToken(sessionToken);
 
@@ -63,7 +62,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			return { user: newUser, sessionToken };
 		});
 
-		// 6. Set the secure HttpOnly cookie
+		// Set the secure HttpOnly cookie
 		cookies.set('session_id', result.sessionToken, {
 			path: '/',
 			httpOnly: true,

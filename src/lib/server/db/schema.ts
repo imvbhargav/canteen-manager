@@ -7,11 +7,13 @@ import {
 	numeric,
 	uuid,
 	pgEnum,
-	check
+	check,
+	varchar
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
 export const userRoleEnum = pgEnum('user_role', ['STUDENT', 'STAFF', 'ADMIN']);
+export const otpStatusEnum = pgEnum('otp_status', ['PENDING', 'VERIFIED', 'EXPIRED']);
 export const categoryEnum = pgEnum('menu_category', ['Breakfast', 'Lunch', 'Snacks', 'Beverages']);
 export const dietaryEnum = pgEnum('dietary_type', ['veg', 'non-veg']);
 export const ticketStatusEnum = pgEnum('ticket_status', [
@@ -58,10 +60,6 @@ export const users = pgTable(
 		role: userRoleEnum('role').default('STUDENT').notNull(),
 		balance: numeric('balance', { precision: 10, scale: 2 }).notNull().default('0.00'),
 		pinHash: text('pin_hash'),
-		biometricsEnabled: boolean('biometrics_enabled').default(false).notNull(),
-		notifyOrders: boolean('notify_orders').default(true).notNull(),
-		notifyWallet: boolean('notify_wallet').default(true).notNull(),
-		notifyPromo: boolean('notify_promo').default(false).notNull(),
 		isActive: boolean('is_active').default(true).notNull(),
 		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
@@ -80,6 +78,14 @@ export const userSessions = pgTable('user_sessions', {
 	lastActiveAt: timestamp('last_active_at', { withTimezone: true }).defaultNow().notNull(),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 	expiresAt: timestamp('expires_at', { withTimezone: true }).notNull()
+});
+
+// Updated table for User-Level Rate Limiting
+export const loginAttempts = pgTable('login_attempts', {
+	id: uuid('id').defaultRandom().primaryKey(),
+	ipAddress: varchar('ip_address', { length: 45 }).notNull(), // Kept for audit/security logs
+	identifier: varchar('identifier', { length: 255 }).notNull(), // The targeted username/ID
+	attemptedAt: timestamp('attempted_at').defaultNow().notNull()
 });
 
 export const menuItems = pgTable(
@@ -204,11 +210,33 @@ export const walletTransactions = pgTable(
 	(table) => [check('wallet_txn_amount_check', sql`${table.amount} > 0`)]
 );
 
+export const manualOrderOtps = pgTable(
+	'manual_order_otps',
+	{
+		id: uuid('id').defaultRandom().primaryKey(),
+		userId: uuid('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		otpCode: varchar('otp_code', { length: 6 }).notNull().unique(), // Unique so admin can lookup by OTP
+		status: otpStatusEnum('status').default('PENDING').notNull(),
+		attempts: integer('attempts').default(0).notNull(), // Brute-force protection
+		expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(table) => [check('manual_otp_attempts_check', sql`${table.attempts} <= 3`)]
+);
+
+export const manualOrderOtpsRelations = relations(manualOrderOtps, ({ one }) => ({
+	user: one(users, { fields: [manualOrderOtps.userId], references: [users.id] })
+}));
+
 export const usersRelations = relations(users, ({ many }) => ({
 	sessions: many(userSessions),
 	tickets: many(tickets),
 	payments: many(payments),
-	walletTransactions: many(walletTransactions)
+	walletTransactions: many(walletTransactions),
+	manualOrderOtps: many(manualOrderOtps)
 }));
 
 export const userSessionsRelations = relations(userSessions, ({ one }) => ({

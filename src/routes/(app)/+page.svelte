@@ -145,7 +145,9 @@
 <svelte:head><title>Dashboard | MunchUp</title></svelte:head>
 
 {#if appState.wallet}
-	<div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
+	<div
+		class="animate-in fade-in absolute inset-0 z-20 flex flex-col overflow-y-auto bg-background duration-300"
+	>
 		<header
 			class="sticky top-0 z-100 flex h-16 shrink-0 items-center justify-between gap-3 bg-background/15 px-5 backdrop-blur-md"
 		>

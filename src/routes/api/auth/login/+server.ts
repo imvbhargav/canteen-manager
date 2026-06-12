@@ -1,13 +1,18 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { users, userSessions } from '$lib/server/db/schema';
-import { eq, or } from 'drizzle-orm';
+import { users, userSessions, loginAttempts } from '$lib/server/db/schema';
+import { eq, or, and, sql, count } from 'drizzle-orm';
 import { generateSessionToken, hashSessionToken, verifyPin } from '$lib/server/auth';
 import type { RequestHandler } from './$types';
 import { dev } from '$app/environment';
 
-export const POST: RequestHandler = async ({ request, cookies }) => {
+// Rate Limiting Configuration
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_HOURS = 1;
+
+export const POST: RequestHandler = async ({ request, cookies, getClientAddress }) => {
 	try {
+		// Parse Request
 		const {
 			identifier,
 			pin,
@@ -22,7 +27,40 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			return json({ success: false, error: 'Missing credentials' }, { status: 400 });
 		}
 
+		// Normalize identifier right away to prevent bypasses like 'student123' vs 'STUDENT123'
 		const normalizedIdentifier = identifier.toUpperCase();
+		const clientIp = getClientAddress();
+
+		// Check User-Level Rate Limit
+		const recentAttempts = await db
+			.select({ value: count() })
+			.from(loginAttempts)
+			.where(
+				and(
+					eq(loginAttempts.identifier, normalizedIdentifier),
+					sql`${loginAttempts.attemptedAt} > NOW() - INTERVAL '${sql.raw(`${LOCKOUT_HOURS} hour`)}'`
+				)
+			);
+
+		const attemptCount = recentAttempts[0]?.value ?? 0;
+
+		if (attemptCount >= MAX_ATTEMPTS) {
+			return json(
+				{
+					success: false,
+					error: 'Too many failed attempts on this account. Please try again in an hour.'
+				},
+				{ status: 429, headers: { 'Retry-After': String(LOCKOUT_HOURS * 60 * 60) } }
+			);
+		}
+
+		// Log this attempt immediately (captures the brute force signature)
+		await db.insert(loginAttempts).values({
+			ipAddress: clientIp,
+			identifier: normalizedIdentifier
+		});
+
+		// Validate User against Database
 		const user = await db.query.users.findFirst({
 			where: or(
 				eq(users.studentId, normalizedIdentifier),
@@ -51,6 +89,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			return json({ success: false, error: 'Invalid credentials' }, { status: 401 });
 		}
 
+		// Clear history on successful login so they have a fresh slate next time
+		await db.delete(loginAttempts).where(eq(loginAttempts.identifier, normalizedIdentifier));
+
+		// Create Session
 		const sessionToken = generateSessionToken();
 		const tokenHash = hashSessionToken(sessionToken);
 
@@ -76,7 +118,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			role: user.role,
 			message: 'Logged in successfully'
 		});
-	} catch {
+	} catch (err) {
+		console.error('Login error:', err);
 		return json({ success: false, error: 'Internal Server Error' }, { status: 500 });
 	}
 };

@@ -2,7 +2,7 @@
 	import '../layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/stores';
-	import { UtensilsCrossed, WifiOff, Users, ReceiptIndianRupee } from 'lucide-svelte';
+	import { UtensilsCrossed, WifiOff, Users, ReceiptIndianRupee, ChartBar } from 'lucide-svelte';
 	import { resolve } from '$app/paths';
 	import { onMount, type Snippet } from 'svelte';
 
@@ -43,7 +43,8 @@
 	const adminNavItems = [
 		{ path: resolve('/admin'), icon: UtensilsCrossed, label: 'Menu' },
 		{ path: resolve('/admin/counters'), icon: ReceiptIndianRupee, label: 'Counters' },
-		{ path: resolve('/admin/users'), icon: Users, label: 'Users' }
+		{ path: resolve('/admin/users'), icon: Users, label: 'Users' },
+		{ path: resolve('/admin/analytics'), icon: ChartBar, label: 'Analytics' }
 	];
 
 	let currentPath = $derived($page.url.pathname);
@@ -56,7 +57,7 @@
 
 {#if isOffline}
 	<div
-		class="fixed inset-0 z-9999 flex flex-col items-center justify-center bg-background/80 backdrop-blur-md"
+		class="fixed inset-0 z-9999 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm"
 	>
 		<div class="flex max-w-[80%] flex-col items-center space-y-4 text-center">
 			<div

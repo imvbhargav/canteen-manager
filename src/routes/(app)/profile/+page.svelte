@@ -81,7 +81,9 @@
 
 <svelte:head><title>Profile | MunchUp</title></svelte:head>
 
-<div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
+<div
+	class="animate-in fade-in absolute inset-0 z-20 flex flex-col overflow-y-auto bg-background duration-300"
+>
 	<!-- ── Header: fixed height h-16, matches menu and ticket screens ── -->
 	<header
 		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
