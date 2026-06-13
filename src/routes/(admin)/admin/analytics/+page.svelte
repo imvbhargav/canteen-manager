@@ -19,7 +19,6 @@
 	import { SvelteDate, SvelteURLSearchParams } from 'svelte/reactivity';
 	import AppLogo from '$lib/components/AppLogo.svelte';
 
-	// --- Types ---
 	interface Summary {
 		totalRevenue: string;
 		totalOrders: number;
@@ -28,26 +27,31 @@
 		revenueGrowth: number | null;
 		ordersGrowth: number | null;
 	}
+
 	interface TimeSeriesData {
 		period: string;
 		revenue: string;
 		orders: number;
 	}
+
 	interface PeakHourData {
 		hour: number;
 		orders: number;
 		revenue: string;
 	}
+
 	interface CategoryData {
 		category: string;
 		quantitySold: number;
 		revenue: string;
 		orderCount: number;
 	}
+
 	interface StatusData {
 		status: string;
 		count: number;
 	}
+
 	interface ItemAnalyticsData {
 		id: string;
 		name: string;
@@ -56,9 +60,11 @@
 		revenueGenerated: string;
 		avgUnitPrice: string;
 	}
+
 	interface AnalyticsResponse {
 		summary: Summary;
 		groupBy: 'none' | 'day' | 'week' | 'month';
+		windowSize: number;
 		timeSeries: TimeSeriesData[];
 		peakHours: PeakHourData[];
 		categoryBreakdown: CategoryData[];
@@ -72,6 +78,7 @@
 		unitPrice: string;
 		menuItem: { name: string; dietary: 'veg' | 'non-veg' };
 	}
+
 	interface OrderFeedRecord {
 		id: string;
 		ticketReference: string;
@@ -115,54 +122,84 @@
 		}
 	}
 
-	// --- State ---
-	let isLoading = $state(true);
-	let errorMessage = $state('');
-	let data = $state<AnalyticsResponse | null>(null);
-	let activeTab = $state<ActiveTab>('METRICS');
+	let isLoading: boolean = $state(true);
+	let errorMessage: string = $state('');
+	let data: AnalyticsResponse | null = $state<AnalyticsResponse | null>(null);
+	let activeTab: ActiveTab = $state<ActiveTab>('METRICS');
 
-	let feedOrders = $state<OrderFeedRecord[]>([]);
-	let isFetchingOrdersFeed = $state(false);
-	let nextCursor = $state<string | null>(null);
-	let hasNextPage = $state(false);
+	let feedOrders: OrderFeedRecord[] = $state<OrderFeedRecord[]>([]);
+	let isFetchingOrdersFeed: boolean = $state(false);
+	let nextCursor: string | null = $state<string | null>(null);
+	let hasNextPage: boolean = $state(false);
 
-	let activePreset = $state<Preset>('30d');
+	let activePreset: Preset = $state<Preset>('30d');
 
-	let customStart = $state(getDateString(29));
-	let customEnd = $state(getDateString(0));
+	let customStart: string = $state(getDateString(29));
+	let customEnd: string = $state(getDateString(0));
 
-	let effectiveStart = $derived(
+	let effectiveStart: string = $derived(
 		activePreset === 'custom' ? customStart : datesForPreset(activePreset).start
 	);
-	let effectiveEnd = $derived(
+	let effectiveEnd: string = $derived(
 		activePreset === 'custom' ? customEnd : datesForPreset(activePreset).end
 	);
 
-	// --- Chart derived ---
-	let maxRevenue = $derived(
-		data?.timeSeries?.length
-			? Math.max(...data.timeSeries.map((d: TimeSeriesData) => Number(d.revenue)))
-			: 0
-	);
-	let maxHourOrders = $derived(
+	let tappedBarIndex: number = $state(-1);
+	let tappedHour: number = $state(-1);
+
+	let maxHourOrders: number = $derived(
 		data?.peakHours?.length ? Math.max(...data.peakHours.map((h: PeakHourData) => h.orders)) : 0
 	);
-	let totalCategoryRevenue = $derived(
+	let totalCategoryRevenue: number = $derived(
 		data?.categoryBreakdown?.reduce((acc: number, c: CategoryData) => acc + Number(c.revenue), 0) ??
 			0
 	);
-	let totalItemRevenue = $derived(
+	let totalItemRevenue: number = $derived(
 		data?.itemAnalytics?.reduce(
 			(acc: number, i: ItemAnalyticsData) => acc + Number(i.revenueGenerated),
 			0
 		) ?? 0
 	);
 
+	let chartPage: number = $state(0);
+
+	let totalChartPages: number = $derived.by((): number => {
+		const series = data?.timeSeries ?? [];
+		const win = data?.windowSize ?? series.length;
+		if (!win || series.length === 0) return 1;
+		return Math.ceil(series.length / win);
+	});
+
+	let displayTimeSeries: TimeSeriesData[] = $derived.by((): TimeSeriesData[] => {
+		const series = data?.timeSeries ?? [];
+		const win = data?.windowSize;
+		if (!win || series.length === 0) return series;
+		const pages = Math.ceil(series.length / win);
+		const forwardPage = pages - 1 - chartPage;
+		const start = forwardPage * win;
+		return series.slice(start, start + win);
+	});
+
+	let displayMaxRevenue: number = $derived(
+		displayTimeSeries.length
+			? Math.max(...displayTimeSeries.map((d: TimeSeriesData) => Number(d.revenue)))
+			: 0
+	);
+
+	let tappedHourEntry: PeakHourData | null = $derived(
+		tappedHour >= 0
+			? (data?.peakHours?.find((p: PeakHourData) => p.hour === tappedHour) ?? null)
+			: null
+	);
+
 	onMount(() => {
 		executeTabSyncLoad();
 	});
 
-	function executeTabSyncLoad() {
+	function executeTabSyncLoad(): void {
+		tappedBarIndex = -1;
+		tappedHour = -1;
+		chartPage = 0;
 		if (activeTab === 'METRICS') {
 			fetchAnalytics();
 		} else {
@@ -170,7 +207,7 @@
 		}
 	}
 
-	async function fetchAnalytics() {
+	async function fetchAnalytics(): Promise<void> {
 		isLoading = true;
 		errorMessage = '';
 		try {
@@ -192,7 +229,10 @@
 		}
 	}
 
-	async function fetchOrdersFeed(clearCurrent = true, cursor: string | null = null) {
+	async function fetchOrdersFeed(
+		clearCurrent: boolean = true,
+		cursor: string | null = null
+	): Promise<void> {
 		isFetchingOrdersFeed = true;
 		if (clearCurrent) {
 			feedOrders = [];
@@ -221,33 +261,67 @@
 				hasNextPage = json.data.pagination.hasNextPage;
 			}
 		} catch (err) {
-			console.error('Failed to pull analytical orders stream', err);
+			console.error(err);
 		} finally {
 			isFetchingOrdersFeed = false;
 		}
 	}
 
-	function changeTab(tab: ActiveTab) {
+	function changeTab(tab: ActiveTab): void {
 		activeTab = tab;
 		executeTabSyncLoad();
 	}
 
-	function selectPreset(p: Preset) {
+	function selectPreset(p: Preset): void {
 		activePreset = p;
 		if (p !== 'custom') executeTabSyncLoad();
 	}
 
-	function applyCustomRange() {
+	function applyCustomRange(): void {
 		executeTabSyncLoad();
 	}
 
-	function formatDateLabel(dateString: string, group: string) {
+	function handleBarTap(index: number): void {
+		tappedBarIndex = tappedBarIndex === index ? -1 : index;
+	}
+
+	function handleHourTap(h: number): void {
+		tappedHour = tappedHour === h ? -1 : h;
+	}
+
+	function formatAxisLabel(dateString: string, group: string): string {
+		if (group === 'week' || group === 'month') {
+			const index =
+				data?.timeSeries?.findIndex((p: TimeSeriesData) => p.period === dateString) ?? 0;
+			return `${group === 'week' ? 'Week' : 'Month'} ${index + 1}`;
+		}
+
 		const parts = dateString.split('-');
 		if (parts.length < 3) return dateString;
 		const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-		if (group === 'month')
-			return d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
 		return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+	}
+
+	function formatDetailLabel(dateString: string, group: string): string {
+		const parts = dateString.split('-');
+		if (parts.length < 3) return dateString;
+
+		const start = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+		const formatOpt: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+
+		if (group === 'week') {
+			const end = new SvelteDate(start);
+			end.setDate(end.getDate() + 6);
+			return `${start.toLocaleDateString(undefined, formatOpt)} - ${end.toLocaleDateString(undefined, formatOpt)}`;
+		}
+
+		if (group === 'month') {
+			const end = new SvelteDate(start);
+			end.setMonth(end.getMonth() + 1);
+			return `${start.toLocaleDateString(undefined, formatOpt)} - ${end.toLocaleDateString(undefined, formatOpt)}`;
+		}
+
+		return start.toLocaleDateString(undefined, formatOpt);
 	}
 
 	function formatTimestamp(isoString: string): string {
@@ -267,10 +341,11 @@
 		return `${val >= 0 ? '+' : ''}${val.toFixed(1)}%`;
 	}
 
-	function growthPositive(val: number | null) {
+	function growthPositive(val: number | null): boolean {
 		return val !== null && val > 0;
 	}
-	function growthNegative(val: number | null) {
+
+	function growthNegative(val: number | null): boolean {
 		return val !== null && val < 0;
 	}
 
@@ -302,7 +377,7 @@
 		READY: { dot: 'bg-violet-400', label: 'Ready', text: 'text-violet-600', bg: 'bg-violet-500/10' }
 	};
 
-	const CATEGORY_COLORS = [
+	const CATEGORY_COLORS: string[] = [
 		'bg-primary',
 		'bg-emerald-500',
 		'bg-violet-500',
@@ -317,7 +392,6 @@
 <div
 	class="animate-in fade-in absolute inset-0 z-20 flex flex-col overflow-y-auto bg-background duration-300"
 >
-	<!-- Sticky Header -->
 	<header class="sticky top-0 z-30 border-b border-muted/20 bg-background/90 backdrop-blur-md">
 		<div
 			class="flex h-16 shrink-0 items-center justify-between gap-3 bg-background/15 px-5 backdrop-blur-md"
@@ -346,7 +420,6 @@
 			</div>
 		</div>
 
-		<!-- Presets Filters -->
 		<div class="flex scrollbar-none items-center gap-1.5 overflow-x-auto p-4">
 			{#each PRESETS as p (p.key)}
 				<button
@@ -361,8 +434,7 @@
 			{/each}
 		</div>
 
-		<!-- Tab Controls -->
-		<div class="flex gap-2 px-4 py-1.5">
+		<div class="mx-3 flex gap-2 rounded-2xl border border-accent/10 bg-accent/5 p-1.5">
 			<button
 				onclick={() => changeTab('METRICS')}
 				class="flex-1 rounded-xl py-2 text-[12px] font-bold transition-all {activeTab === 'METRICS'
@@ -407,7 +479,6 @@
 		{/if}
 	</header>
 
-	<!-- Content Area -->
 	<div class="flex flex-col gap-4 px-4 py-4 pb-10">
 		{#if activeTab === 'METRICS'}
 			{#if errorMessage}
@@ -424,15 +495,14 @@
 					<Loader2 size={30} strokeWidth={2.5} class="animate-spin text-primary" />
 				</div>
 			{:else if data}
-				<!-- KPIs -->
 				<div
 					class="flex items-center justify-between rounded-2xl border border-muted/30 bg-card p-5 shadow-sm"
 				>
 					<div>
-						<p class="mb-1 text-[10px] font-black tracking-widest text-foreground/40 uppercase">
+						<p class="mb-1 text-[10px] font-bold tracking-widest text-foreground/40 uppercase">
 							Total Revenue
 						</p>
-						<p class="font-mono text-[30px] leading-none font-black tracking-tight text-foreground">
+						<p class="font-mono text-[30px] leading-none font-bold tracking-tight text-foreground">
 							{formatCurrencyINR(Number(data.summary.totalRevenue))}
 						</p>
 						<div class="mt-2 flex items-center gap-1.5">
@@ -463,10 +533,10 @@
 					class="flex items-center justify-between rounded-2xl border border-muted/30 bg-card p-5 shadow-sm"
 				>
 					<div>
-						<p class="mb-1 text-[10px] font-black tracking-widest text-foreground/40 uppercase">
+						<p class="mb-1 text-[10px] font-bold tracking-widest text-foreground/40 uppercase">
 							Total Orders
 						</p>
-						<p class="font-mono text-[30px] leading-none font-black tracking-tight text-foreground">
+						<p class="font-mono text-[30px] leading-none font-bold tracking-tight text-foreground">
 							{data.summary.totalOrders.toLocaleString()}
 						</p>
 						<div class="mt-2 flex items-center gap-1.5">
@@ -497,10 +567,10 @@
 					class="flex items-center justify-between rounded-2xl border border-muted/30 bg-card p-5 shadow-sm"
 				>
 					<div>
-						<p class="mb-1 text-[10px] font-black tracking-widest text-foreground/40 uppercase">
+						<p class="mb-1 text-[10px] font-bold tracking-widest text-foreground/40 uppercase">
 							Avg Order Value
 						</p>
-						<p class="font-mono text-[30px] leading-none font-black tracking-tight text-foreground">
+						<p class="font-mono text-[30px] leading-none font-bold tracking-tight text-foreground">
 							{formatCurrencyINR(Number(data.summary.avgOrderValue))}
 						</p>
 						<p class="mt-2 text-[11px] font-bold text-foreground/35">
@@ -514,64 +584,133 @@
 					</div>
 				</div>
 
-				<!-- SMART CONDITIONAL RENDER: Revenue Trend Section -->
 				{#if data.groupBy !== 'none'}
+					{@const pages = totalChartPages}
+					{@const series = displayTimeSeries}
 					<div class="rounded-2xl border border-muted/30 bg-card p-4 shadow-sm">
-						<div class="mb-4 flex items-center gap-2">
-							<BarChart3 size={16} strokeWidth={2.5} class="text-primary" />
-							<h3 class="text-[14px] font-black text-foreground">
-								Revenue Trend ({data.groupBy} wise)
-							</h3>
+						<div class="mb-3 flex items-center justify-between gap-2">
+							<div class="flex items-center gap-2">
+								<BarChart3 size={16} strokeWidth={2.5} class="text-primary" />
+								<h3 class="text-[14px] font-bold text-foreground">
+									Revenue Trend <span
+										class="ml-1 text-[12px] font-semibold text-foreground/50 capitalize"
+										>({data.groupBy === 'day'
+											? 'Daily'
+											: data.groupBy === 'week'
+												? 'Weekly'
+												: 'Monthly'})</span
+									>
+								</h3>
+							</div>
+							{#if pages > 1}
+								<div class="flex items-center gap-1">
+									<button
+										type="button"
+										onclick={() => {
+											chartPage = Math.min(chartPage + 1, pages - 1);
+											tappedBarIndex = -1;
+										}}
+										disabled={chartPage >= pages - 1}
+										class="flex h-7 w-7 items-center justify-center rounded-lg bg-muted/20 text-foreground/50 transition-all active:scale-95 disabled:opacity-25"
+										aria-label="Older"
+									>
+										<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+											<path
+												d="M7.5 2L3.5 6L7.5 10"
+												stroke="currentColor"
+												stroke-width="2"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+											/>
+										</svg>
+									</button>
+									<span class="min-w-8 text-center text-[10px] font-bold text-foreground/40">
+										{chartPage + 1}/{pages}
+									</span>
+									<button
+										type="button"
+										onclick={() => {
+											chartPage = Math.max(chartPage - 1, 0);
+											tappedBarIndex = -1;
+										}}
+										disabled={chartPage <= 0}
+										class="flex h-7 w-7 items-center justify-center rounded-lg bg-muted/20 text-foreground/50 transition-all active:scale-95 disabled:opacity-25"
+										aria-label="Newer"
+									>
+										<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+											<path
+												d="M4.5 2L8.5 6L4.5 10"
+												stroke="currentColor"
+												stroke-width="2"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+											/>
+										</svg>
+									</button>
+								</div>
+							{/if}
 						</div>
-						{#if data.timeSeries.length === 0}
+
+						<div class="mb-3 h-10 rounded-xl bg-muted/15 px-3 py-2">
+							{#if tappedBarIndex >= 0 && series[tappedBarIndex]}
+								{@const pt = series[tappedBarIndex]}
+								<div class="flex items-center justify-between">
+									<span class="text-[11px] font-bold text-foreground/60">
+										{formatDetailLabel(pt.period, data.groupBy)}
+									</span>
+									<div class="flex items-center gap-3">
+										<span class="text-[11px] font-bold text-foreground/40">{pt.orders} orders</span>
+										<span class="font-mono text-[13px] font-bold text-primary">
+											{formatCurrencyINR(Number(pt.revenue))}
+										</span>
+									</div>
+								</div>
+							{:else}
+								<p class="text-[11px] font-bold text-foreground/25">Tap a bar to see details</p>
+							{/if}
+						</div>
+
+						{#if series.length === 0}
 							<div class="flex h-36 items-center justify-center rounded-xl bg-muted/10">
 								<p class="text-[12px] font-bold text-foreground/30">No data available</p>
 							</div>
 						{:else}
-							<div
-								class="relative flex h-44 w-full scrollbar-none items-end gap-1.5 overflow-x-auto pb-6"
-							>
-								{#each data.timeSeries as point (point.period)}
+							<div class="relative flex h-40 w-full items-end gap-1.5 pb-6">
+								{#each series as point, i (point.period)}
 									{@const heightPct =
-										maxRevenue > 0 ? (Number(point.revenue) / maxRevenue) * 100 : 0}
-									<div
-										class="group relative flex h-full min-w-10 flex-1 flex-col items-center justify-end"
+										displayMaxRevenue > 0 ? (Number(point.revenue) / displayMaxRevenue) * 100 : 0}
+									{@const isTapped = tappedBarIndex === i}
+									<button
+										type="button"
+										onclick={() => handleBarTap(i)}
+										class="relative flex h-full flex-1 flex-col items-center justify-end focus:outline-none"
+										aria-label="{formatDetailLabel(point.period, data.groupBy)}: {formatCurrencyINR(
+											Number(point.revenue)
+										)}"
 									>
 										<div
-											class="pointer-events-none absolute bottom-full z-10 mb-2 hidden flex-col items-center group-hover:flex"
-										>
-											<div
-												class="rounded-xl bg-foreground px-2.5 py-1.5 text-center whitespace-nowrap shadow-xl"
-											>
-												<p class="font-mono text-[11px] font-bold text-background">
-													{formatCurrencyINR(Number(point.revenue))}
-												</p>
-												<p class="text-[9px] font-bold text-background/60">{point.orders} orders</p>
-											</div>
-											<div
-												class="h-0 w-0 border-x-[5px] border-t-[5px] border-x-transparent border-t-foreground"
-											></div>
-										</div>
-										<div
-											class="w-full cursor-default rounded-t-lg bg-primary/20 transition-all duration-500 hover:bg-primary"
+											class="w-full rounded-t-lg transition-all duration-300 {isTapped
+												? 'bg-primary'
+												: 'bg-primary/25'}"
 											style="height: {Math.max(heightPct, 2)}%;"
 										></div>
-										<span class="absolute bottom-0 text-[8px] font-bold text-foreground/35"
-											>{formatDateLabel(point.period, data.groupBy)}</span
+										<span
+											class="absolute bottom-0 text-[8px] leading-none font-bold text-foreground/50"
 										>
-									</div>
+											{formatAxisLabel(point.period, data.groupBy)}
+										</span>
+									</button>
 								{/each}
 							</div>
 						{/if}
 					</div>
 				{/if}
 
-				<!-- SMART CONDITIONAL RENDER: Peak Hours Section (Only shown for 1d / Today queries) -->
 				{#if data.groupBy === 'none'}
 					<div class="rounded-2xl border border-muted/30 bg-card p-4 shadow-sm">
 						<div class="mb-4 flex items-center gap-2">
 							<Clock size={16} strokeWidth={2.5} class="text-amber-500" />
-							<h3 class="text-[14px] font-black text-foreground">Peak Intraday Run</h3>
+							<h3 class="text-[14px] font-bold text-foreground">Peak Intraday Run</h3>
 						</div>
 						{#if !data.peakHours || data.peakHours.length === 0}
 							<p class="py-6 text-center text-[12px] font-bold text-foreground/30">
@@ -579,32 +718,51 @@
 							</p>
 						{:else}
 							<div class="space-y-3">
+								<div class="h-10 rounded-xl bg-muted/15 px-3 py-2">
+									{#if tappedHour >= 0}
+										<div class="flex items-center justify-between">
+											<span class="text-[11px] font-bold text-foreground/60">
+												{formatHour(tappedHour)}
+											</span>
+											{#if tappedHourEntry}
+												<div class="flex items-center gap-3">
+													<span class="text-[11px] font-bold text-foreground/40"
+														>{tappedHourEntry.orders} orders</span
+													>
+													<span class="font-mono text-[13px] font-bold text-amber-500">
+														{formatCurrencyINR(Number(tappedHourEntry.revenue))}
+													</span>
+												</div>
+											{:else}
+												<span class="text-[11px] font-bold text-foreground/30"
+													>No orders this hour</span
+												>
+											{/if}
+										</div>
+									{:else}
+										<p class="text-[11px] font-bold text-foreground/25">
+											Tap a cell to see details
+										</p>
+									{/if}
+								</div>
+
 								<div class="grid grid-cols-12 gap-1">
 									{#each Array.from({ length: 24 }, (_, i) => i) as h (h)}
 										{@const entry = data.peakHours.find((p: PeakHourData) => p.hour === h)}
 										{@const intensity =
 											entry && maxHourOrders > 0 ? entry.orders / maxHourOrders : 0}
-										<div
-											class="group relative aspect-square rounded-md transition-all"
+										{@const isTapped = tappedHour === h}
+										<button
+											type="button"
+											onclick={() => handleHourTap(h)}
+											class="aspect-square rounded-md transition-all focus:outline-none {isTapped
+												? 'ring-2 ring-amber-400 ring-offset-1'
+												: ''}"
 											style="background: color-mix(in oklch, var(--color-primary) {Math.round(
 												intensity * 80 + (intensity > 0 ? 8 : 0)
 											)}%, transparent);"
-											title="{formatHour(h)}: {entry?.orders ?? 0} orders"
-										>
-											{#if entry && entry.orders > 0}
-												<div
-													class="pointer-events-none absolute inset-x-0 -top-8 z-10 hidden justify-center group-hover:flex"
-												>
-													<div
-														class="rounded-lg bg-foreground px-1.5 py-0.5 whitespace-nowrap shadow-lg"
-													>
-														<p class="text-[9px] font-bold text-background">
-															{formatHour(h)} · {entry.orders}
-														</p>
-													</div>
-												</div>
-											{/if}
-										</div>
+											aria-label="{formatHour(h)}: {entry?.orders ?? 0} orders"
+										></button>
 									{/each}
 								</div>
 								<div class="flex justify-between px-0.5 text-[9px] font-bold text-foreground/30">
@@ -615,12 +773,11 @@
 					</div>
 				{/if}
 
-				<!-- Category Breakdown Section -->
 				{#if data.categoryBreakdown && data.categoryBreakdown.length > 0}
 					<div class="rounded-2xl border border-muted/30 bg-card p-4 shadow-sm">
 						<div class="mb-4 flex items-center gap-2">
 							<Tag size={16} strokeWidth={2.5} class="text-violet-500" />
-							<h3 class="text-[14px] font-black text-foreground">By Category</h3>
+							<h3 class="text-[14px] font-bold text-foreground">By Category</h3>
 						</div>
 						<div class="space-y-4">
 							{#each data.categoryBreakdown as cat, i (cat.category)}
@@ -640,7 +797,7 @@
 											<span class="text-[11px] font-bold text-foreground/40"
 												>{cat.quantitySold} sold</span
 											>
-											<span class="font-mono text-[13px] font-black text-foreground"
+											<span class="font-mono text-[13px] font-bold text-foreground"
 												>{formatCurrencyINR(Number(cat.revenue))}</span
 											>
 										</div>
@@ -662,7 +819,6 @@
 					</div>
 				{/if}
 
-				<!-- Distribution Status Section -->
 				{#if data.statusDistribution && data.statusDistribution.length > 0}
 					{@const totalStatusCount = data.statusDistribution.reduce(
 						(a: number, s: StatusData) => a + s.count,
@@ -671,7 +827,7 @@
 					<div class="rounded-2xl border border-muted/30 bg-card p-4 shadow-sm">
 						<div class="mb-4 flex items-center gap-2">
 							<Receipt size={16} strokeWidth={2.5} class="text-blue-500" />
-							<h3 class="text-[14px] font-black text-foreground">Order Status</h3>
+							<h3 class="text-[14px] font-bold text-foreground">Order Status</h3>
 						</div>
 						<div class="mb-4 flex h-3 w-full overflow-hidden rounded-full">
 							{#each data.statusDistribution as s (s.status)}
@@ -693,7 +849,7 @@
 										<span class="text-[13px] font-bold text-foreground">{style.label}</span>
 									</div>
 									<div class="flex items-baseline gap-1.5">
-										<span class="font-mono text-[13px] font-black text-foreground">{s.count}</span>
+										<span class="font-mono text-[13px] font-bold text-foreground">{s.count}</span>
 										<span class="text-[10px] font-bold text-foreground/35">{pct}%</span>
 									</div>
 								</div>
@@ -702,11 +858,10 @@
 					</div>
 				{/if}
 
-				<!-- Top Items Section -->
 				<div class="rounded-2xl border border-muted/30 bg-card p-4 shadow-sm">
 					<div class="mb-4 flex items-center gap-2">
 						<Utensils size={16} strokeWidth={2.5} class="text-orange-500" />
-						<h3 class="text-[14px] font-black text-foreground">Top Items</h3>
+						<h3 class="text-[14px] font-bold text-foreground">Top Items</h3>
 					</div>
 					{#if data.itemAnalytics.length === 0}
 						<p class="py-6 text-center text-[12px] font-bold text-foreground/30">
@@ -719,11 +874,11 @@
 									totalItemRevenue > 0
 										? (Number(item.revenueGenerated) / totalItemRevenue) * 100
 										: 0}
-								<div class="rounded-xl px-3 py-3 transition-colors hover:bg-muted/10">
+								<div class="rounded-xl px-3 py-3 transition-colors active:bg-muted/10">
 									<div class="mb-2 flex items-start justify-between gap-3">
 										<div class="flex min-w-0 items-start gap-3">
 											<span
-												class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted/40 text-[9px] font-black text-foreground/50"
+												class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted/40 text-[9px] font-bold text-foreground/50"
 												>{i + 1}</span
 											>
 											<div class="min-w-0">
@@ -737,7 +892,7 @@
 											</div>
 										</div>
 										<div class="shrink-0 text-right">
-											<p class="font-mono text-[13px] font-black text-foreground">
+											<p class="font-mono text-[13px] font-bold text-foreground">
 												{formatCurrencyINR(Number(item.revenueGenerated))}
 											</p>
 											<p class="text-[9px] font-bold text-foreground/40">
@@ -760,7 +915,6 @@
 				</div>
 			{/if}
 		{:else if activeTab === 'ORDERS_LIST'}
-			<!-- Order Log Feed Tab -->
 			<div class="space-y-3">
 				{#if feedOrders.length === 0 && !isFetchingOrdersFeed}
 					<div class="rounded-2xl border border-muted/25 bg-card py-12 text-center">
@@ -781,11 +935,11 @@
 								<div class="flex items-start justify-between gap-2">
 									<div class="min-w-0 flex-1">
 										<div class="flex items-center gap-2">
-											<span class="font-mono text-[14px] font-black text-foreground"
+											<span class="font-mono text-[14px] font-bold text-foreground"
 												>{order.ticketReference}</span
 											>
 											<span
-												class="rounded px-1.5 py-0.5 text-[9px] font-black tracking-wider uppercase {style.bg} {style.text}"
+												class="rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase {style.bg} {style.text}"
 												>{order.status}</span
 											>
 										</div>
@@ -798,7 +952,7 @@
 										</div>
 									</div>
 									<div class="shrink-0 text-right">
-										<p class="font-mono text-[14px] font-black text-foreground">
+										<p class="font-mono text-[14px] font-bold text-foreground">
 											{formatCurrencyINR(Number(order.totalAmount))}
 										</p>
 										<p class="text-[9px] font-semibold tracking-wider text-foreground/35 uppercase">

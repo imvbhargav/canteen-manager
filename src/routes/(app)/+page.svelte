@@ -315,12 +315,11 @@
 							<UtensilsCrossed size={12} strokeWidth={2.5} />
 							Full Menu
 						</p>
-						<h2 class="mt-2 text-[26px] leading-tight font-black tracking-tight text-white">
-							View Everything
+						<h2 class="font-outfit mt-2 text-2xl leading-tight font-bold tracking-tight text-white">
+							Fresh. Wholesome. Everyday
 						</h2>
 						<p class="mt-2 text-[14px] leading-relaxed font-medium text-white/55">
-							Skip the line. Browse today's fresh canteen specials and order your favorites
-							instantly.
+							Made without artificial colours, flavour enhancers, or preservatives.
 						</p>
 
 						<div

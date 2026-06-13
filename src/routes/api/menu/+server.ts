@@ -3,6 +3,7 @@ import { db } from '$lib/server/db';
 import { eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { menuItems } from '$lib/server/db/schema';
+import { and } from 'drizzle-orm';
 
 interface MenuPayload {
 	id: string;
@@ -17,13 +18,17 @@ interface MenuPayload {
 
 export const GET: RequestHandler = async ({ url }) => {
 	try {
-		const includeArchived = url.searchParams.get('includeArchived') === 'true';
+		const includeArchived = url.searchParams.get('archived') === 'true';
+		const includeOut = url.searchParams.get('out') === 'true';
+
+		const conditions = [];
+		if (!includeArchived) conditions.push(eq(menuItems.isArchived, false));
+		if (!includeOut) conditions.push(eq(menuItems.inStock, true));
 
 		const activeMenu = await db.query.menuItems.findMany({
-			where: includeArchived ? undefined : eq(menuItems.isArchived, false),
+			where: conditions.length ? and(...conditions) : undefined,
 			orderBy: (menuItems, { asc }) => [asc(menuItems.category), asc(menuItems.name)]
 		});
-
 		return json({ success: true, data: activeMenu });
 	} catch {
 		return json({ success: false, error: 'Internal Server Error' }, { status: 500 });

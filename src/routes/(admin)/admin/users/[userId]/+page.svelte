@@ -363,12 +363,12 @@
 					</button>
 				</div>
 
-				<div class="mt-4 grid grid-cols-2 gap-3 border-t border-muted/20 pt-4">
+				<div class="mt-4 flex gap-3 border-t border-muted/20 pt-4">
 					<button
 						type="button"
 						onclick={triggerManualOtpGeneration}
 						disabled={isGeneratingOtp}
-						class="flex items-center justify-center gap-2 rounded-xl bg-muted/40 px-3 py-3 text-[12px] font-bold text-foreground transition-all hover:bg-muted/60 active:scale-[0.97]"
+						class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-muted/40 px-3 py-3 text-[12px] font-bold text-foreground transition-all hover:bg-muted/60 active:scale-[0.97]"
 					>
 						{#if isGeneratingOtp}
 							<Loader2 size={14} class="animate-spin text-foreground/50" />
@@ -382,10 +382,10 @@
 					<button
 						type="button"
 						onclick={() => (showResetModal = true)}
-						class="flex items-center justify-center gap-2 rounded-xl border border-destructive/20 px-3 py-3 text-[12px] font-bold text-destructive transition-all hover:bg-destructive/5 active:scale-[0.97]"
+						class="flex items-center justify-center gap-2 rounded-xl border border-destructive/20 px-6 py-3 text-[12px] font-bold text-destructive transition-all hover:bg-destructive/5 active:scale-[0.97]"
 					>
 						<RefreshCw size={14} />
-						Reset App PIN
+						Reset PIN
 					</button>
 				</div>
 
@@ -416,23 +416,23 @@
 			</div>
 		{/if}
 
-		<div class="flex gap-2 rounded-full bg-muted/20 p-1.5">
+		<div class="flex gap-2 rounded-2xl border border-accent/10 bg-accent/5 p-1.5">
 			<button
 				onclick={() => (activeTab = 'ORDERS')}
-				class="flex-1 rounded-full py-2 text-[12px] font-bold transition-all {activeTab === 'ORDERS'
-					? 'bg-background text-foreground shadow-sm'
+				class="flex-1 rounded-xl py-2 text-[12px] font-bold transition-all {activeTab === 'ORDERS'
+					? 'bg-primary text-background shadow-sm'
 					: 'text-foreground/50 hover:text-foreground'}">Orders</button
 			>
 			<button
 				onclick={() => (activeTab = 'TXNS')}
-				class="flex-1 rounded-full py-2 text-[12px] font-bold transition-all {activeTab === 'TXNS'
-					? 'bg-background text-foreground shadow-sm'
+				class="flex-1 rounded-xl py-2 text-[12px] font-bold transition-all {activeTab === 'TXNS'
+					? 'bg-primary text-background shadow-sm'
 					: 'text-foreground/50 hover:text-foreground'}">Transactions</button
 			>
 			<button
 				onclick={() => (activeTab = 'FUNDS')}
-				class="flex-1 rounded-full py-2 text-[12px] font-bold transition-all {activeTab === 'FUNDS'
-					? 'bg-background text-foreground shadow-sm'
+				class="flex-1 rounded-xl py-2 text-[12px] font-bold transition-all {activeTab === 'FUNDS'
+					? 'bg-primary text-background shadow-sm'
 					: 'text-foreground/50 hover:text-foreground'}">Funds</button
 			>
 		</div>

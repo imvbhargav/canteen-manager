@@ -31,17 +31,27 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		const prevStartDate = new Date(startDate.getTime() - periodMs);
 		const prevEndDate = new Date(startDate.getTime() - 1);
 
-		// Smart Grouping Calculation based on day count
+		// Smart Grouping + Window Size
+		// < 1 day  → none (today: intraday heatmap)
+		// < 14 days → day-wise,  window = 7 (one week per page)
+		// < 60 days → week-wise, window = 4 (one month per page)
+		// ≥ 60 days → month-wise, window = 3 (one quarter per page)
 		const diffDays = Math.ceil(periodMs / (1000 * 60 * 60 * 24));
-		let groupBy = 'day';
+		let groupBy: 'none' | 'day' | 'week' | 'month';
+		let windowSize: number;
+
 		if (diffDays <= 1) {
-			groupBy = 'none'; // Today view skips time-series trend calculation
-		} else if (diffDays <= 30) {
+			groupBy = 'none';
+			windowSize = 0;
+		} else if (diffDays < 14) {
 			groupBy = 'day';
-		} else if (diffDays <= 90) {
+			windowSize = 7;
+		} else if (diffDays < 60) {
 			groupBy = 'week';
+			windowSize = 4;
 		} else {
 			groupBy = 'month';
+			windowSize = 3;
 		}
 
 		const baseFilter = and(
@@ -191,6 +201,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 					ordersGrowth
 				},
 				groupBy,
+				windowSize,
 				timeSeries: timeSeriesResult,
 				peakHours: peakHoursResult,
 				categoryBreakdown: categoryBreakdownResult,

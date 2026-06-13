@@ -98,7 +98,7 @@
 	async function fetchMenuItems(showSkeleton: boolean = true): Promise<void> {
 		if (showSkeleton) isFetchingMenu = true;
 		try {
-			const res: Response = await fetch('/api/menu?includeArchived=true');
+			const res: Response = await fetch('/api/menu?archived=true&out=true');
 			const data = await res.json();
 			if (res.ok && data.success) {
 				menuItemsList = data.data;

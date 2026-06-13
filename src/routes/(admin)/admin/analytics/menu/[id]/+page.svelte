@@ -284,12 +284,12 @@
 			</a>
 			<div class="min-w-0 flex-1">
 				{#if meta}
-					<p class="truncate text-[13px] font-black tracking-tight">{meta.name}</p>
+					<p class="truncate text-[13px] font-bold tracking-tight">{meta.name}</p>
 					<p class="text-[10px] font-semibold tracking-widest text-foreground/40 uppercase">
 						Analytics
 					</p>
 				{:else}
-					<p class="text-[13px] font-black tracking-tight">Analytics</p>
+					<p class="text-[13px] font-bold tracking-tight">Analytics</p>
 				{/if}
 			</div>
 		</div>
@@ -299,7 +299,7 @@
 			{#each RANGES as r (r.key)}
 				<button
 					onclick={() => handleRangeChange(r.key)}
-					class="shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-black tracking-wider uppercase transition-all
+					class="shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-bold tracking-wider uppercase transition-all
 						{currentRange === r.key
 						? 'bg-foreground text-background'
 						: 'bg-muted/30 text-foreground/50 hover:bg-muted/50 hover:text-foreground/80'}"
@@ -315,7 +315,7 @@
 		<!-- ── Custom date picker ──────────────────────────────────── -->
 		{#if currentRange === 'custom'}
 			<div class="space-y-3 rounded-2xl border border-muted/30 bg-card p-4">
-				<p class="text-[11px] font-black tracking-widest text-foreground/40 uppercase">
+				<p class="text-[11px] font-bold tracking-widest text-foreground/40 uppercase">
 					Select date range
 				</p>
 				<div class="grid grid-cols-2 gap-2">
@@ -352,7 +352,7 @@
 				<button
 					onclick={applyCustomRange}
 					disabled={!pendingStart || !pendingEnd || pendingStart > pendingEnd}
-					class="w-full rounded-xl bg-foreground py-2.5 text-[12px] font-black tracking-widest text-background uppercase transition-all active:scale-[0.98] disabled:opacity-40"
+					class="w-full rounded-xl bg-foreground py-2.5 text-[12px] font-bold tracking-widest text-background uppercase transition-all active:scale-[0.98] disabled:opacity-40"
 				>
 					Apply range
 				</button>
@@ -374,27 +374,29 @@
 		{:else}
 			<!-- ── Item card ────────────────────────────────────────── -->
 			<div class="rounded-2xl border border-muted/25 bg-card p-4">
-				<div class="flex items-start justify-between gap-3">
+				<div class="flex items-end justify-between gap-3">
 					<div class="min-w-0">
 						<div class="mb-1.5 flex flex-wrap items-center gap-1.5">
 							<span
-								class="rounded-md bg-primary/10 px-2 py-0.5 text-[9px] font-black tracking-widest text-primary uppercase"
+								class="rounded-md bg-primary/10 px-2 py-0.5 text-[9px] font-bold tracking-widest text-primary uppercase"
 							>
 								{meta?.category}
 							</span>
 							{#if meta?.isArchived}
 								<span
-									class="rounded-md bg-amber-500/10 px-2 py-0.5 text-[9px] font-black tracking-widest text-amber-500 uppercase"
+									class="rounded-md bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold tracking-widest text-amber-500 uppercase"
 								>
 									Archived
 								</span>
 							{/if}
 						</div>
-						<h2 class="text-xl leading-tight font-black tracking-tight">{meta?.name}</h2>
+						<h2 class="text-2xl leading-tight font-black tracking-tight">
+							{meta?.name}
+						</h2>
 					</div>
 					<div class="shrink-0 text-right">
 						<p class="text-[9px] font-bold tracking-widest text-foreground/40 uppercase">Price</p>
-						<p class="font-mono text-xl font-black">₹{meta?.price}</p>
+						<p class="font-mono text-xl font-bold">₹{meta?.price}</p>
 					</div>
 				</div>
 			</div>
@@ -403,7 +405,7 @@
 			<div class="grid grid-cols-2 gap-1.5 rounded-2xl border border-accent/10 bg-accent/5 p-1.5">
 				<button
 					onclick={() => switchTab('overview')}
-					class="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11px] font-black tracking-wider uppercase transition-all
+					class="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11px] font-bold tracking-wider uppercase transition-all
 						{activeTab === 'overview'
 						? 'bg-primary text-background shadow-sm'
 						: 'text-foreground/40 hover:text-foreground/60'}"
@@ -413,7 +415,7 @@
 				</button>
 				<button
 					onclick={() => switchTab('orders')}
-					class="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11px] font-black tracking-wider uppercase transition-all
+					class="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[11px] font-bold tracking-wider uppercase transition-all
 						{activeTab === 'orders'
 						? 'bg-primary text-background shadow-sm'
 						: 'text-foreground/40 hover:text-foreground/60'}"
@@ -440,13 +442,13 @@
 							class="flex flex-col justify-between rounded-2xl border border-muted/20 bg-card p-4 py-3.5"
 						>
 							<div class="flex items-center justify-between gap-1">
-								<span class="text-[10px] font-black tracking-wider text-foreground/40 uppercase"
+								<span class="text-[10px] font-bold tracking-wider text-foreground/40 uppercase"
 									>Gross sales</span
 								>
 								<IndianRupee size={12} strokeWidth={2.5} class="shrink-0 text-emerald-500" />
 							</div>
 							<div class="mt-3">
-								<p class="font-mono text-[22px] leading-none font-black tracking-tight">
+								<p class="font-mono text-[22px] leading-none font-bold tracking-tight">
 									{formatCurrencyINR(Number(summary?.totalRevenue ?? 0))}
 								</p>
 								<p class="mt-1 font-mono text-[10px] text-foreground/35">
@@ -459,13 +461,13 @@
 							class="flex flex-col justify-between rounded-2xl border border-muted/20 bg-card p-4 py-3.5"
 						>
 							<div class="flex items-center justify-between gap-1">
-								<span class="text-[10px] font-black tracking-wider text-foreground/40 uppercase"
+								<span class="text-[10px] font-bold tracking-wider text-foreground/40 uppercase"
 									>Units sold</span
 								>
 								<ShoppingBag size={12} strokeWidth={2.5} class="shrink-0 text-primary" />
 							</div>
 							<div class="mt-3">
-								<p class="font-mono text-[22px] leading-none font-black tracking-tight">
+								<p class="font-mono text-[22px] leading-none font-bold tracking-tight">
 									{summary?.totalQuantity ?? 0}
 								</p>
 								<p class="mt-1 text-[10px] text-foreground/35">items ordered</p>
@@ -476,13 +478,13 @@
 							class="flex flex-col justify-between rounded-2xl border border-muted/20 bg-card p-4 py-3.5"
 						>
 							<div class="flex items-center justify-between gap-1">
-								<span class="text-[10px] font-black tracking-wider text-foreground/40 uppercase"
+								<span class="text-[10px] font-bold tracking-wider text-foreground/40 uppercase"
 									>Customers</span
 								>
 								<Users size={12} strokeWidth={2.5} class="shrink-0 text-blue-500" />
 							</div>
 							<div class="mt-3">
-								<p class="font-mono text-[22px] leading-none font-black tracking-tight">
+								<p class="font-mono text-[22px] leading-none font-bold tracking-tight">
 									{summary?.uniqueCustomers ?? 0}
 								</p>
 								<p class="mt-1 text-[10px] text-foreground/35">unique buyers</p>
@@ -493,13 +495,13 @@
 							class="flex flex-col justify-between rounded-2xl border border-muted/20 bg-card p-4 py-3.5"
 						>
 							<div class="flex items-center justify-between gap-1">
-								<span class="text-[10px] font-black tracking-wider text-foreground/40 uppercase"
+								<span class="text-[10px] font-bold tracking-wider text-foreground/40 uppercase"
 									>Avg / order</span
 								>
 								<Receipt size={12} strokeWidth={2.5} class="shrink-0 text-purple-500" />
 							</div>
 							<div class="mt-3">
-								<p class="font-mono text-[22px] leading-none font-black tracking-tight">
+								<p class="font-mono text-[22px] leading-none font-bold tracking-tight">
 									{formatCurrencyINR(Number(summary?.avgOrderValue ?? 0))}
 								</p>
 								<p class="mt-1 font-mono text-[10px] text-foreground/35">
@@ -518,13 +520,13 @@
 					<div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
 						<div class="mb-3 flex items-center gap-1.5">
 							<Trophy size={11} strokeWidth={2.5} class="text-emerald-500" />
-							<span class="text-[10px] font-black tracking-widest text-emerald-500 uppercase"
+							<span class="text-[10px] font-bold tracking-widest text-emerald-500 uppercase"
 								>Best day</span
 							>
 						</div>
 						<div class="flex items-end justify-between gap-2">
 							<div>
-								<p class="font-mono text-[26px] leading-none font-black tracking-tight">
+								<p class="font-mono text-[26px] leading-none font-bold tracking-tight">
 									{formatCurrencyINR(Number(best.revenue))}
 								</p>
 								<p class="mt-1.5 text-[11px] font-semibold text-foreground/50">
@@ -532,7 +534,7 @@
 								</p>
 							</div>
 							<div class="text-right">
-								<p class="font-mono text-[20px] leading-none font-black tracking-tight">
+								<p class="font-mono text-[20px] leading-none font-bold tracking-tight">
 									{best.quantity}
 								</p>
 								<p class="mt-1.5 text-[11px] font-semibold text-foreground/50">units sold</p>
@@ -546,7 +548,7 @@
 					<div class="space-y-2">
 						<div class="flex items-center gap-1.5 px-1">
 							<CalendarDays size={11} strokeWidth={2.5} class="text-foreground/30" />
-							<h3 class="text-[11px] font-black tracking-widest text-foreground/40 uppercase">
+							<h3 class="text-[11px] font-bold tracking-widest text-foreground/40 uppercase">
 								Top {top.length} day{top.length === 1 ? '' : 's'}
 							</h3>
 						</div>
@@ -562,7 +564,7 @@
 									>{formatDateShort(day.date)}</span
 								>
 								<span class="font-mono text-[12px] text-foreground/40">{day.quantity}×</span>
-								<span class="w-16 text-right font-mono text-[13px] font-black text-foreground">
+								<span class="w-16 text-right font-mono text-[13px] font-bold text-foreground">
 									{formatCurrencyINR(Number(day.revenue))}
 								</span>
 							</div>
@@ -629,7 +631,7 @@
 										</p>
 									</div>
 									<div class="shrink-0 text-right">
-										<p class="font-mono text-[14px] leading-none font-black text-foreground">
+										<p class="font-mono text-[14px] leading-none font-bold text-foreground">
 											{formatCurrencyINR(lineTotal)}
 										</p>
 										<p class="mt-0.5 font-mono text-[10px] text-foreground/35">
@@ -643,7 +645,7 @@
 										{formatDateTime(order.createdAt)}
 									</span>
 									<span
-										class="rounded-md px-1.5 py-0.5 text-[9px] font-black tracking-widest uppercase
+										class="rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-widest uppercase
 										{order.status === 'COMPLETED'
 											? 'bg-emerald-500/10 text-emerald-500'
 											: order.status === 'READY'
@@ -663,7 +665,7 @@
 							<button
 								onclick={loadMoreOrders}
 								disabled={ordersLoading}
-								class="flex w-full items-center justify-center gap-2 rounded-xl border border-muted/20 bg-card py-3 text-[11px] font-black tracking-widest text-foreground/50 uppercase transition-all hover:bg-muted/10 active:scale-[0.99] disabled:opacity-50"
+								class="flex w-full items-center justify-center gap-2 rounded-xl border border-muted/20 bg-card py-3 text-[11px] font-bold tracking-widest text-foreground/50 uppercase transition-all hover:bg-muted/10 active:scale-[0.99] disabled:opacity-50"
 							>
 								{#if ordersLoading}
 									<Loader2 size={13} strokeWidth={2.5} class="animate-spin" />
