@@ -249,9 +249,9 @@
 								</label>
 								<input
 									id="batchYearInput"
-									type="number"
-									min="2000"
-									max="2100"
+									type="text"
+									inputmode="numeric"
+									pattern="[0-0]*"
 									bind:value={editableBatchYear}
 									disabled={isSubmitting}
 									class="w-full rounded-xl border border-muted/40 bg-background px-3 py-2.5 font-mono text-[13px] font-bold text-foreground outline-none focus:border-foreground/30 disabled:opacity-50"
@@ -266,9 +266,9 @@
 								</label>
 								<input
 									id="gradYearInput"
-									type="number"
-									min="2000"
-									max="2100"
+									type="text"
+									inputmode="numeric"
+									pattern="[0-0]*"
 									bind:value={editableGraduationYear}
 									disabled={isSubmitting}
 									class="w-full rounded-xl border border-muted/40 bg-background px-3 py-2.5 font-mono text-[13px] font-bold text-foreground outline-none focus:border-foreground/30 disabled:opacity-50"
