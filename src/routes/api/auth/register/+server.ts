@@ -12,7 +12,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			name,
 			accountNumber,
 			pin,
-			credentialImage, // Captures either the R2 object fileKey path or the Cloudinary URL
+			credentialImage,
+			batch,
 			deviceIdentifier = 'Web App'
 		} = await request.json();
 
@@ -48,13 +49,21 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			return json({ success: false, error: 'Account Number already registered' }, { status: 409 });
 		}
 
+		// Parse Batch Year strings (e.g., "2022 - 2026")
+		let parsedBatchStart = new Date().getFullYear();
+		let parsedBatchEnd = parsedBatchStart + 4;
+		if (batch && batch.includes('-')) {
+			const parts = batch.split('-').map((p: string) => parseInt(p.trim(), 10));
+			if (!isNaN(parts[0])) parsedBatchStart = parts[0];
+			if (!isNaN(parts[1])) parsedBatchEnd = parts[1];
+		}
+
 		const generatedReferenceKey = `${name
 			.replace(/[^a-zA-Z]/g, '')
 			.slice(0, 3)
 			.toUpperCase()}${cleanAccount}`;
 		const hashedPin = hashPin(cleanPin);
 
-		// Normalize string target context based on our chosen backend system architecture
 		let finalCredentialUrl = credentialImage;
 		if (IMAGE_STORAGE_PROVIDER === 'R2') {
 			finalCredentialUrl = `${R2_PUBLIC_DOMAIN.replace(/\/$/, '')}/${credentialImage}`;
@@ -69,6 +78,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 					accountNumber: cleanAccount,
 					pinHash: hashedPin,
 					credentialPhotoUrl: finalCredentialUrl,
+					batchYear: parsedBatchStart,
+					expectedGraduationYear: parsedBatchEnd,
 					isActive: false,
 					deactivationReason: 'verification'
 				})

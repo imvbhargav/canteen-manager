@@ -19,6 +19,7 @@
 	let accountNumber = $state('');
 	let pin = $state('');
 	let confirmPin = $state('');
+	let batchString = $state('');
 
 	let imageBase64 = $state('');
 	let rawFileFile: File | null = $state(null);
@@ -71,87 +72,130 @@
 		try {
 			const result = await Tesseract.recognize(imageSrc, 'eng');
 			const lines: string[] = result.data.text.split('\n').map((line) => line.trim());
-			parseOcrTextToForm(lines);
+
+			const parsedData = parseOcrTextToForm(lines);
+
+			name = parsedData.name;
+			accountNumber = parsedData.accountNumber;
+			batchString = parsedData.batch;
 		} catch (err) {
 			console.error('OCR Extraction Engine Failure:', err);
+			errorMsg = 'Failed to extract text from the card image.';
 		} finally {
 			isOcrProcessing = false;
 		}
 	}
 
 	function parseOcrTextToForm(lines: string[]) {
-		const idIndicatorPattern = /id\s*[:.-]/i;
+		let extractedName = '';
+		let extractedAccountNumber = '';
+		let extractedProgram = '';
+		let extractedBatch = '';
 
-		// Label patterns that signal the VALUE is on the NEXT line
-		const nextLineLabelPatterns: Record<string, RegExp> = {
-			name: /^(name|full\s*name)\s*[:.-]*\s*$/i,
-			accountNumber: /^(roll\s*no|roll\s*number|id\s*no|employee\s*id|student\s*id)\s*[:.-]*\s*$/i,
-			program: /^(program|course|department)\s*[:.-]*\s*$/i,
-			batch: /^(batch|year)\s*[:.-]*\s*$/i
+		const cleanedLines = lines
+			.map((line) =>
+				line
+					.replace(/[|[\]()]/g, '')
+					.replace(/\s+/g, ' ')
+					.trim()
+			)
+			.filter((line) => line.length > 0);
+
+		const labelPatterns = {
+			name: /^(name|full\s*name)\s*[:.-]*/i,
+			accountNumber:
+				/^(roll\s*no|roll\s*number|id\s*no|employee\s*id|student\s*id|se\s*roll\s*no)\s*[:.-]*/i,
+			program: /^(program|course|department)\s*[:.-]*/i,
+			batch: /^(batch|year)\s*[:.-]*/i
 		};
 
-		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i].trim();
-			const nextLine = lines[i + 1]?.trim() ?? '';
+		for (let i = 0; i < cleanedLines.length; i++) {
+			const line = cleanedLines[i];
+			const nextLine = cleanedLines[i + 1] ?? '';
 
-			if (!name && nextLineLabelPatterns.name.test(line) && nextLine) {
-				const candidate = nextLine.split(/[^a-zA-Z\s]/)[0].trim();
-				if (candidate.length > 2) {
-					name = candidate;
-					i++; // consume the value line
-					continue;
-				}
-			}
-
-			if (!accountNumber && nextLineLabelPatterns.accountNumber.test(line) && nextLine) {
-				const match = nextLine.match(/^[A-Z0-9-]+/i);
-				if (match) {
-					accountNumber = match[0].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+			if (!extractedName && labelPatterns.name.test(line)) {
+				let inlineValue = line.replace(labelPatterns.name, '').trim();
+				if (inlineValue.length > 0) {
+					extractedName = inlineValue;
+				} else if (nextLine) {
+					extractedName = nextLine;
 					i++;
-					continue;
 				}
+				continue;
 			}
 
-			if (!accountNumber && idIndicatorPattern.test(line)) {
-				let potentialId = line.replace(/^.*?id\s*[:.-]*\s*/i, '').trim();
-				const match = potentialId.match(/^[A-Z0-9-]+/i);
-				if (match) {
-					accountNumber = match[0].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-					continue;
+			if (!extractedAccountNumber && labelPatterns.accountNumber.test(line)) {
+				let inlineValue = line.replace(labelPatterns.accountNumber, '').trim();
+
+				let textToSearch = inlineValue;
+				if (textToSearch.length < 4 && nextLine) {
+					textToSearch = nextLine;
+					if (inlineValue.length === 0) i++;
 				}
+
+				const idMatch = textToSearch.match(/[A-Z0-9]{5,}/i);
+				if (idMatch) {
+					extractedAccountNumber = idMatch[0].toUpperCase();
+				}
+				continue;
 			}
 
-			if (
-				!name &&
-				/name/i.test(line) &&
-				line.toUpperCase() !== 'NAME' &&
-				line.toUpperCase() !== 'FULL NAME'
-			) {
-				const cleanedName = line.replace(/^(name|full\s+name)[\s.:,-]+/i, '').trim();
-				const structuralName = cleanedName.split(/[^a-zA-Z\s]/)[0].trim();
-				if (structuralName.length > 2) {
-					name = structuralName;
-					continue;
+			if (!extractedProgram && labelPatterns.program.test(line)) {
+				let inlineValue = line.replace(labelPatterns.program, '').trim();
+				if (inlineValue.length > 0) {
+					extractedProgram = inlineValue;
+				} else if (nextLine) {
+					extractedProgram = nextLine;
+					i++;
 				}
+				continue;
+			}
+
+			if (!extractedBatch && labelPatterns.batch.test(line)) {
+				let inlineValue = line.replace(labelPatterns.batch, '').trim();
+				if (inlineValue.length > 0) {
+					extractedBatch = inlineValue;
+				} else if (nextLine) {
+					extractedBatch = nextLine;
+					i++;
+				}
+				continue;
 			}
 		}
 
-		// ── Fallback: bare all-caps name line (no label at all) ──
-		if (!name) {
-			const pureLettersPattern = /^[A-Z\s]{4,25}$/i;
-			const excluded = new Set(['NAME', 'FULL NAME', 'CARD', 'STUDENT', 'IDENTITY', 'NETWORK']);
-			const plausibleNames = lines.filter((line: string) => {
+		if (!extractedName) {
+			const pureLettersPattern = /^[A-Za-z\s]{4,25}$/;
+			const excluded = new Set([
+				'NAME',
+				'FULL NAME',
+				'CARD',
+				'STUDENT',
+				'IDENTITY',
+				'NETWORK',
+				'KNOWLEDGE',
+				'INNOVATION',
+				'EXCELLENCE'
+			]);
+
+			for (const line of cleanedLines) {
 				const upper = line.toUpperCase().trim();
-				return (
+				if (
 					pureLettersPattern.test(line) &&
 					!excluded.has(upper) &&
 					![...excluded].some((ex) => upper.includes(ex))
-				);
-			});
-			if (plausibleNames.length > 0) {
-				name = plausibleNames[0].trim();
+				) {
+					extractedName = line;
+					break;
+				}
 			}
 		}
+
+		return {
+			name: extractedName,
+			accountNumber: extractedAccountNumber,
+			program: extractedProgram,
+			batch: extractedBatch
+		};
 	}
 
 	function removeImage() {
@@ -159,6 +203,7 @@
 		rawFileFile = null;
 		name = '';
 		accountNumber = '';
+		batchString = '';
 	}
 
 	async function uploadImageToTargetStorage(): Promise<string | null> {
@@ -241,6 +286,7 @@
 					name,
 					accountNumber,
 					pin,
+					batch: batchString,
 					credentialImage: uploadPayloadReference
 				})
 			});
@@ -472,7 +518,6 @@
 			</button>
 		</div>
 	{:else}
-		<!-- SUCCESS STATE -->
 		<div
 			class="animate-in zoom-in-95 mt-12 flex flex-1 flex-col justify-center px-5 text-center duration-300"
 		>

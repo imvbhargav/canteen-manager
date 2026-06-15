@@ -431,7 +431,7 @@
 						<p class="text-[10px] font-bold tracking-[0.15em] text-foreground/50 uppercase">
 							Current Balance
 						</p>
-						<p class="mt-1 font-mono text-[24px] font-black tracking-tight text-foreground">
+						<p class="mt-1 font-mono text-[24px] font-bold tracking-tight text-foreground">
 							{formatCurrencyINR(Number(targetUser.balance))}
 						</p>
 					</div>
