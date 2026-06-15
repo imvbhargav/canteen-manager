@@ -82,10 +82,37 @@
 	function parseOcrTextToForm(lines: string[]) {
 		const idIndicatorPattern = /id\s*[:.-]/i;
 
-		for (const line of lines) {
-			const upperLine = line.toUpperCase().trim();
+		// Label patterns that signal the VALUE is on the NEXT line
+		const nextLineLabelPatterns: Record<string, RegExp> = {
+			name: /^(name|full\s*name)\s*[:.-]*\s*$/i,
+			accountNumber: /^(roll\s*no|roll\s*number|id\s*no|employee\s*id|student\s*id)\s*[:.-]*\s*$/i,
+			program: /^(program|course|department)\s*[:.-]*\s*$/i,
+			batch: /^(batch|year)\s*[:.-]*\s*$/i
+		};
 
-			if (idIndicatorPattern.test(line) && !accountNumber) {
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i].trim();
+			const nextLine = lines[i + 1]?.trim() ?? '';
+
+			if (!name && nextLineLabelPatterns.name.test(line) && nextLine) {
+				const candidate = nextLine.split(/[^a-zA-Z\s]/)[0].trim();
+				if (candidate.length > 2) {
+					name = candidate;
+					i++; // consume the value line
+					continue;
+				}
+			}
+
+			if (!accountNumber && nextLineLabelPatterns.accountNumber.test(line) && nextLine) {
+				const match = nextLine.match(/^[A-Z0-9-]+/i);
+				if (match) {
+					accountNumber = match[0].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+					i++;
+					continue;
+				}
+			}
+
+			if (!accountNumber && idIndicatorPattern.test(line)) {
 				let potentialId = line.replace(/^.*?id\s*[:.-]*\s*/i, '').trim();
 				const match = potentialId.match(/^[A-Z0-9-]+/i);
 				if (match) {
@@ -94,29 +121,31 @@
 				}
 			}
 
-			if (upperLine.includes('NAME') && upperLine !== 'NAME' && upperLine !== 'FULL NAME') {
+			if (
+				!name &&
+				/name/i.test(line) &&
+				line.toUpperCase() !== 'NAME' &&
+				line.toUpperCase() !== 'FULL NAME'
+			) {
 				const cleanedName = line.replace(/^(name|full\s+name)[\s.:,-]+/i, '').trim();
 				const structuralName = cleanedName.split(/[^a-zA-Z\s]/)[0].trim();
-
-				if (structuralName.length > 2 && !name) {
+				if (structuralName.length > 2) {
 					name = structuralName;
 					continue;
 				}
 			}
 		}
 
+		// ── Fallback: bare all-caps name line (no label at all) ──
 		if (!name) {
 			const pureLettersPattern = /^[A-Z\s]{4,25}$/i;
+			const excluded = new Set(['NAME', 'FULL NAME', 'CARD', 'STUDENT', 'IDENTITY', 'NETWORK']);
 			const plausibleNames = lines.filter((line: string) => {
 				const upper = line.toUpperCase().trim();
 				return (
 					pureLettersPattern.test(line) &&
-					upper !== 'NAME' &&
-					upper !== 'FULL NAME' &&
-					!upper.includes('CARD') &&
-					!upper.includes('STUDENT') &&
-					!upper.includes('IDENTITY') &&
-					!upper.includes('NETWORK')
+					!excluded.has(upper) &&
+					![...excluded].some((ex) => upper.includes(ex))
 				);
 			});
 			if (plausibleNames.length > 0) {
