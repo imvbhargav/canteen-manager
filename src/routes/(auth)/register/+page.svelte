@@ -73,6 +73,7 @@
 			const result = await Tesseract.recognize(imageSrc, 'eng');
 			const lines: string[] = result.data.text.split('\n').map((line) => line.trim());
 
+			console.log(lines);
 			const parsedData = parseOcrTextToForm(lines);
 
 			name = parsedData.name;
@@ -95,37 +96,55 @@
 		const cleanedLines = lines
 			.map((line) =>
 				line
-					.replace(/[|[\]()]/g, '')
+					.replace(/[|[\]()—_-]/g, '') // Clears out structural artifacts cleanly
 					.replace(/\s+/g, ' ')
 					.trim()
 			)
 			.filter((line) => line.length > 0);
 
+		// Strict boundary validation to prevent cross-label pollution
 		const labelPatterns = {
-			name: /^(name|full\s*name)\s*[:.-]*/i,
+			name: /^(name|full\s*name)$/i,
 			accountNumber:
-				/^(roll\s*no|roll\s*number|id\s*no|employee\s*id|student\s*id|se\s*roll\s*no)\s*[:.-]*/i,
-			program: /^(program|course|department)\s*[:.-]*/i,
-			batch: /^(batch|year)\s*[:.-]*/i
+				/^(roll\s*no|roll\s*number|\bid\s*no\b|employee\s*id|student\s*id|se\s*roll\s*no)$/i,
+			program: /^(program|course|department)$/i,
+			batch: /^(batch|year)$/i
 		};
 
 		for (let i = 0; i < cleanedLines.length; i++) {
 			const line = cleanedLines[i];
 			const nextLine = cleanedLines[i + 1] ?? '';
 
-			if (!extractedName && labelPatterns.name.test(line)) {
-				let inlineValue = line.replace(labelPatterns.name, '').trim();
+			// Separate label match from content text for structured multi-line parsing
+			const dynamicClean = line.replace(/[:.-]/g, '').trim();
+
+			// 1. EXTRACT NAME
+			if (
+				!extractedName &&
+				(labelPatterns.name.test(dynamicClean) || dynamicClean.toLowerCase().startsWith('name '))
+			) {
+				let inlineValue = line.replace(/^(name|full\s*name)\s*[:.-]*/i, '').trim();
 				if (inlineValue.length > 0) {
 					extractedName = inlineValue;
 				} else if (nextLine) {
 					extractedName = nextLine;
 					i++;
 				}
-				continue;
+				continue; // Prevent matching other fields in this iteration
 			}
 
-			if (!extractedAccountNumber && labelPatterns.accountNumber.test(line)) {
-				let inlineValue = line.replace(labelPatterns.accountNumber, '').trim();
+			// 2. EXTRACT ROLL NO / ACCOUNT NUMBER
+			if (
+				!extractedAccountNumber &&
+				(labelPatterns.accountNumber.test(dynamicClean) ||
+					dynamicClean.toLowerCase().includes('roll no'))
+			) {
+				let inlineValue = line
+					.replace(
+						/^(roll\s*no|roll\s*number|id\s*no|employee\s*id|student\s*id|se\s*roll\s*no)\s*[:.-]*/i,
+						''
+					)
+					.trim();
 
 				let textToSearch = inlineValue;
 				if (textToSearch.length < 4 && nextLine) {
@@ -140,8 +159,9 @@
 				continue;
 			}
 
-			if (!extractedProgram && labelPatterns.program.test(line)) {
-				let inlineValue = line.replace(labelPatterns.program, '').trim();
+			// 3. EXTRACT PROGRAM
+			if (!extractedProgram && labelPatterns.program.test(dynamicClean)) {
+				let inlineValue = line.replace(/^(program|course|department)\s*[:.-]*/i, '').trim();
 				if (inlineValue.length > 0) {
 					extractedProgram = inlineValue;
 				} else if (nextLine) {
@@ -151,8 +171,12 @@
 				continue;
 			}
 
-			if (!extractedBatch && labelPatterns.batch.test(line)) {
-				let inlineValue = line.replace(labelPatterns.batch, '').trim();
+			// 4. EXTRACT BATCH
+			if (
+				!extractedBatch &&
+				(labelPatterns.batch.test(dynamicClean) || dynamicClean.toLowerCase().startsWith('batch'))
+			) {
+				let inlineValue = line.replace(/^(batch|year)\s*[:.-]*/i, '').trim();
 				if (inlineValue.length > 0) {
 					extractedBatch = inlineValue;
 				} else if (nextLine) {
@@ -161,8 +185,23 @@
 				}
 				continue;
 			}
+
+			// Fallback Matcher: Catch lone floating patterns on unlabelled text rows
+			if (!extractedAccountNumber) {
+				const standaloneIdMatch = line.match(/\b[A-Z]{2,3}\d[A-Z0-9]{4,}\b/i);
+				if (standaloneIdMatch) {
+					extractedAccountNumber = standaloneIdMatch[0].toUpperCase();
+				}
+			}
+			if (!extractedBatch) {
+				const standaloneBatchMatch = line.match(/\b\d{4}\s*-\s*\d{4}\b/);
+				if (standaloneBatchMatch) {
+					extractedBatch = standaloneBatchMatch[0];
+				}
+			}
 		}
 
+		// Fallback for standalone names if fields are missing
 		if (!extractedName) {
 			const pureLettersPattern = /^[A-Za-z\s]{4,25}$/;
 			const excluded = new Set([
@@ -174,7 +213,8 @@
 				'NETWORK',
 				'KNOWLEDGE',
 				'INNOVATION',
-				'EXCELLENCE'
+				'EXCELLENCE',
+				'MUNCHUP'
 			]);
 
 			for (const line of cleanedLines) {
@@ -182,7 +222,9 @@
 				if (
 					pureLettersPattern.test(line) &&
 					!excluded.has(upper) &&
-					![...excluded].some((ex) => upper.includes(ex))
+					![...excluded].some((ex) => upper.includes(ex)) &&
+					!line.toLowerCase().includes('tech') &&
+					!line.toLowerCase().includes('science')
 				) {
 					extractedName = line;
 					break;
