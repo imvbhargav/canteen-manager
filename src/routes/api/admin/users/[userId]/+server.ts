@@ -17,16 +17,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 
 	try {
 		const targetUser = await db.query.users.findFirst({
-			where: eq(users.id, params.userId),
-			columns: {
-				id: true,
-				studentId: true,
-				name: true,
-				rollNumber: true,
-				balance: true,
-				isActive: true,
-				createdAt: true
-			}
+			where: eq(users.id, params.userId)
 		});
 
 		if (!targetUser) return json({ success: false, error: 'User not found' }, { status: 404 });

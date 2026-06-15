@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { Loader2, Check } from 'lucide-svelte';
+	import { Loader2, Check, UploadCloud, X, Sparkles, Clock, AlertCircle } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import AppLogo from '$lib/components/AppLogo.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import Tesseract from 'tesseract.js';
 
 	onMount(() => {
 		const setHeight = () => {
@@ -15,15 +16,178 @@
 	});
 
 	let name = $state('');
-	let rollNumber = $state('');
+	let accountNumber = $state('');
 	let pin = $state('');
 	let confirmPin = $state('');
 
+	let imageBase64 = $state('');
+	let rawFileFile: File | null = $state(null);
+	let isDragging = $state(false);
+
 	let errorMsg = $state('');
 	let isLoading = $state(false);
+	let isOcrProcessing = $state(false);
+	let isRegistered = $state(false);
 
-	let isPinMatching = $derived(pin.length === 4 && pin === confirmPin);
-	let isValid = $derived(name.length > 2 && rollNumber.length >= 2 && isPinMatching);
+	let isPinMatching = $derived(pin.length === 5 && pin === confirmPin);
+	let isValid = $derived(
+		name.length > 2 && accountNumber.length >= 2 && isPinMatching && imageBase64.length > 0
+	);
+
+	function handleAlphanumericInput(e: Event, mode: 'account' | 'pin' | 'confirm') {
+		const target = e.target as HTMLInputElement;
+		const sanitized = target.value.replace(/[^a-zA-Z0-9]/g, '');
+
+		if (mode === 'account') accountNumber = sanitized;
+		if (mode === 'pin') pin = sanitized;
+		if (mode === 'confirm') confirmPin = sanitized;
+	}
+
+	function handleFileChange(e: Event) {
+		const target = e.target as HTMLInputElement;
+		if (target.files && target.files[0]) {
+			processFile(target.files[0]);
+		}
+	}
+
+	function processFile(file: File) {
+		if (!file.type.startsWith('image/')) {
+			errorMsg = 'Please select a valid image file format.';
+			return;
+		}
+		rawFileFile = file;
+		const reader = new FileReader();
+		reader.onload = () => {
+			imageBase64 = reader.result as string;
+			runClientSideOcr(reader.result as string);
+		};
+		reader.readAsDataURL(file);
+	}
+
+	async function runClientSideOcr(imageSrc: string) {
+		isOcrProcessing = true;
+		errorMsg = '';
+
+		try {
+			const result = await Tesseract.recognize(imageSrc, 'eng');
+			const lines: string[] = result.data.text.split('\n').map((line) => line.trim());
+			parseOcrTextToForm(lines);
+		} catch (err) {
+			console.error('OCR Extraction Engine Failure:', err);
+		} finally {
+			isOcrProcessing = false;
+		}
+	}
+
+	function parseOcrTextToForm(lines: string[]) {
+		const idIndicatorPattern = /id\s*[:.-]/i;
+
+		for (const line of lines) {
+			const upperLine = line.toUpperCase().trim();
+
+			if (idIndicatorPattern.test(line) && !accountNumber) {
+				let potentialId = line.replace(/^.*?id\s*[:.-]*\s*/i, '').trim();
+				const match = potentialId.match(/^[A-Z0-9-]+/i);
+				if (match) {
+					accountNumber = match[0].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+					continue;
+				}
+			}
+
+			if (upperLine.includes('NAME') && upperLine !== 'NAME' && upperLine !== 'FULL NAME') {
+				const cleanedName = line.replace(/^(name|full\s+name)[\s.:,-]+/i, '').trim();
+				const structuralName = cleanedName.split(/[^a-zA-Z\s]/)[0].trim();
+
+				if (structuralName.length > 2 && !name) {
+					name = structuralName;
+					continue;
+				}
+			}
+		}
+
+		if (!name) {
+			const pureLettersPattern = /^[A-Z\s]{4,25}$/i;
+			const plausibleNames = lines.filter((line: string) => {
+				const upper = line.toUpperCase().trim();
+				return (
+					pureLettersPattern.test(line) &&
+					upper !== 'NAME' &&
+					upper !== 'FULL NAME' &&
+					!upper.includes('CARD') &&
+					!upper.includes('STUDENT') &&
+					!upper.includes('IDENTITY') &&
+					!upper.includes('NETWORK')
+				);
+			});
+			if (plausibleNames.length > 0) {
+				name = plausibleNames[0].trim();
+			}
+		}
+	}
+
+	function removeImage() {
+		imageBase64 = '';
+		rawFileFile = null;
+		name = '';
+		accountNumber = '';
+	}
+
+	async function uploadImageToTargetStorage(): Promise<string | null> {
+		if (!rawFileFile || !accountNumber) return null;
+
+		const signResponse = await fetch('/api/auth/register/sign-image', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ accountNumber })
+		});
+
+		const signData = await signResponse.json();
+		if (!signResponse.ok || !signData.success) {
+			throw new Error(signData.error || 'Failed generating secure image signature context');
+		}
+
+		const formData = new FormData();
+
+		if (signData.provider === 'R2') {
+			Object.entries(signData.fields).forEach(([key, value]) => {
+				formData.append(key, value as string);
+			});
+			formData.append('Content-Type', rawFileFile.type);
+			formData.append('file', rawFileFile);
+
+			const uploadResponse = await fetch(signData.uploadUrl, {
+				method: 'POST',
+				body: formData
+			});
+
+			if (!uploadResponse.ok) {
+				throw new Error('Cloudflare R2 core rejected direct payload configuration submission');
+			}
+
+			return signData.fileKey;
+		} else {
+			formData.append('file', rawFileFile);
+			formData.append('api_key', signData.apiKey);
+			formData.append('timestamp', signData.timestamp.toString());
+			formData.append('signature', signData.signature);
+			formData.append('folder', signData.folder);
+			formData.append('public_id', signData.public_id);
+			formData.append('type', signData.type);
+
+			const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${signData.cloudName}/image/upload`;
+			const uploadResponse = await fetch(cloudinaryUrl, {
+				method: 'POST',
+				body: formData
+			});
+
+			const uploadData = await uploadResponse.json();
+			if (!uploadResponse.ok) {
+				throw new Error(uploadData.error?.message || 'Cloudinary target delivery rejected payload');
+			}
+
+			return uploadData.secure_url;
+		}
+	}
 
 	async function handleRegister(e: Event) {
 		e.preventDefault();
@@ -33,22 +197,35 @@
 		errorMsg = '';
 
 		try {
+			const uploadPayloadReference = await uploadImageToTargetStorage();
+
+			if (!uploadPayloadReference) {
+				errorMsg = 'Verification image transmission sequence dropped.';
+				isLoading = false;
+				return;
+			}
+
 			const res = await fetch('/api/auth/register', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name, rollNumber, pin })
+				body: JSON.stringify({
+					name,
+					accountNumber,
+					pin,
+					credentialImage: uploadPayloadReference
+				})
 			});
 
 			const data = await res.json();
-
 			if (data.success) {
-				window.location.href = '/'; // Hard redirect to load server data
+				isRegistered = true;
 			} else {
 				errorMsg = data.error || 'Registration failed';
 			}
 		} catch (err: unknown) {
 			console.error('Registration error:', err);
-			errorMsg = 'Network error. Please try again.';
+			const errMsg = (err as { message: string }).message;
+			errorMsg = errMsg || 'Network error. Please try again.';
 		} finally {
 			isLoading = false;
 		}
@@ -56,141 +233,294 @@
 </script>
 
 <svelte:head>
-	<title>Create Account | MunchUp</title>
-	<meta name="description" content="Set up your MunchUp profile and digital wallet." />
-	<meta name="robots" content="noindex, nofollow" />
+	<title>{isRegistered ? 'Registration Pending' : 'Create Account'} | MunchUp</title>
 </svelte:head>
 
 <div
 	class="animate-in fade-in relative mx-auto flex h-(--app-height) max-w-md flex-col overflow-hidden bg-background pb-6 duration-300"
 >
-	<!-- ── Header ── -->
 	<header class="flex h-16 shrink-0 items-center gap-3 px-5">
 		<div class="mt-2.5">
 			<AppLogo />
-			<p class="text-[13px] font-medium text-foreground/50">
-				Set up your MunchUp profile and digital wallet.
-			</p>
+			{#if !isRegistered}
+				<p class="text-[13px] font-medium text-foreground/50">
+					Set up your MunchUp profile and digital wallet.
+				</p>
+			{/if}
 		</div>
 	</header>
 
-	<!-- ── Body ── -->
-	<div class="mt-10 flex-1 overflow-y-auto px-5 pt-1">
-		<form onsubmit={handleRegister} class="space-y-5">
+	{#if !isRegistered}
+		<div class="animate-in fade-in mt-8 flex-1 overflow-y-auto px-5 pt-1 duration-200">
+			<form onsubmit={handleRegister} class="space-y-5">
+				<div class="space-y-2">
+					<span class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase">
+						Identification Card
+					</span>
+
+					<div
+						class="relative aspect-[2.2/1] w-full overflow-hidden rounded-2xl border-2 border-dashed border-accent/15 bg-card"
+					>
+						{#if !imageBase64}
+							<label
+								class="flex h-full w-full cursor-pointer flex-col items-center justify-center bg-muted/20 p-4 text-center transition-colors
+                                {isDragging ? 'border-primary bg-primary/5' : 'hover:bg-muted/30'}"
+								ondragover={(e) => {
+									e.preventDefault();
+									isDragging = true;
+								}}
+								ondragleave={() => (isDragging = false)}
+								ondrop={(e) => {
+									e.preventDefault();
+									isDragging = false;
+									if (e.dataTransfer?.files[0]) processFile(e.dataTransfer.files[0]);
+								}}
+							>
+								<UploadCloud size={24} class="mb-1 text-foreground/40" />
+								<span class="text-[13px] font-bold text-foreground">Scan Card Image</span>
+								<span class="mt-0.5 text-[11px] text-foreground/40">PNG, JPG up to 5MB</span>
+								<input type="file" accept="image/*" class="hidden" onchange={handleFileChange} />
+							</label>
+						{:else}
+							<img
+								src={imageBase64}
+								alt="Identity Card Preview"
+								class="h-full w-full object-cover transition-opacity duration-300 {isOcrProcessing
+									? 'opacity-40 blur-xs filter'
+									: 'opacity-100'}"
+							/>
+
+							{#if isOcrProcessing}
+								<div
+									class="absolute inset-0 flex flex-col items-center justify-center bg-background/20 p-4"
+								>
+									<Loader2 size={22} class="animate-spin text-primary" />
+									<p
+										class="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold tracking-wide text-primary uppercase"
+									>
+										<Sparkles size={11} /> Auto-filling...
+									</p>
+								</div>
+							{/if}
+
+							<button
+								type="button"
+								onclick={removeImage}
+								disabled={isLoading}
+								class="absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-full border border-muted/30 bg-background/80 text-foreground shadow-sm backdrop-blur-md transition-transform hover:bg-background active:scale-90 disabled:opacity-50"
+								title="Remove Image"
+							>
+								<X size={12} strokeWidth={2.5} />
+							</button>
+						{/if}
+					</div>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<label
+							for="name"
+							class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
+							>Full Name</label
+						>
+						<input
+							id="name"
+							type="text"
+							bind:value={name}
+							disabled={isLoading}
+							class="w-full rounded-xl border border-muted/30 bg-muted/40 px-3 py-3 text-[13px] font-bold text-foreground transition-all placeholder:text-foreground/30 focus:border-foreground/30 focus:bg-muted/60 disabled:opacity-50"
+							placeholder="Jane Doe"
+							autocomplete="name"
+						/>
+					</div>
+
+					<div class="space-y-2">
+						<label
+							for="accountNumber"
+							class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
+							>User ID</label
+						>
+						<input
+							id="accountNumber"
+							type="text"
+							value={accountNumber}
+							disabled={isLoading}
+							oninput={(e) => handleAlphanumericInput(e, 'account')}
+							class="w-full rounded-xl border border-muted/30 bg-muted/40 px-3 py-3 font-mono text-[13px] font-bold text-foreground uppercase transition-all placeholder:text-foreground/30 focus:border-foreground/30 focus:bg-muted/60 disabled:opacity-50"
+							placeholder="BMS10445"
+							autocomplete="off"
+						/>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<label
+							for="pin"
+							class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
+						>
+							Create PIN
+						</label>
+						<input
+							id="pin"
+							type="password"
+							maxlength="5"
+							value={pin}
+							disabled={isLoading}
+							oninput={(e) => handleAlphanumericInput(e, 'pin')}
+							class="w-full rounded-xl border border-muted/30 bg-muted/40 px-3 py-3 font-mono text-[15px] tracking-[0.2em] text-foreground uppercase transition-all placeholder:text-foreground/20 focus:border-foreground/30 focus:bg-muted/60 disabled:opacity-50"
+							placeholder="•••••"
+							autocomplete="off"
+							autocorrect="off"
+							autocapitalize="off"
+						/>
+					</div>
+
+					<div class="space-y-2">
+						<div class="flex items-end justify-between">
+							<label
+								for="confirmPin"
+								class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
+							>
+								Confirm PIN
+							</label>
+							{#if pin.length === 5 && confirmPin.length > 0 && !isPinMatching}
+								<span class="text-[9px] font-bold text-destructive">Mismatch</span>
+							{/if}
+						</div>
+						<input
+							id="confirmPin"
+							type="password"
+							maxlength="5"
+							value={confirmPin}
+							disabled={isLoading}
+							oninput={(e) => handleAlphanumericInput(e, 'confirm')}
+							class="w-full rounded-xl border border-muted/30 bg-muted/40 px-3 py-3 font-mono text-[15px] tracking-[0.2em] text-foreground uppercase transition-all placeholder:text-foreground/20 focus:border-foreground/30 focus:bg-muted/60 disabled:opacity-50
+                            {pin.length === 5 && confirmPin.length > 0 && !isPinMatching
+								? 'border-destructive/40 bg-destructive/5 text-destructive focus:border-destructive'
+								: ''}"
+							placeholder="•••••"
+							autocomplete="off"
+							autocorrect="off"
+							autocapitalize="off"
+						/>
+					</div>
+				</div>
+
+				<button
+					type="submit"
+					disabled={!isValid || isLoading || isOcrProcessing}
+					class="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-[13px] font-bold text-background transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30"
+				>
+					{#if isLoading}
+						<Loader2 size={15} class="animate-spin" />
+						<span>Processing...</span>
+					{:else}
+						<Check size={15} />
+						<span>Create Account</span>
+					{/if}
+				</button>
+			</form>
+
 			{#if errorMsg}
-				<div class="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3">
+				<div class="mt-4 rounded-full border border-destructive/20 bg-destructive/10 px-4 py-3">
 					<p class="text-[11px] font-bold text-destructive">{errorMsg}</p>
 				</div>
 			{/if}
+		</div>
 
-			<div class="space-y-2">
-				<label
-					for="name"
-					class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
-				>
-					Full Name
-				</label>
-				<input
-					id="name"
-					type="text"
-					bind:value={name}
-					class="w-full rounded-xl border border-muted/30 bg-muted/40 px-4 py-3 text-[14px] font-bold text-foreground transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/30 focus:bg-muted/60"
-					placeholder="e.g. Jane Doe"
-					autocomplete="name"
-				/>
-			</div>
-
-			<div class="space-y-2">
-				<label
-					for="rollNumber"
-					class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
-				>
-					User ID.
-				</label>
-				<input
-					id="rollNumber"
-					type="text"
-					bind:value={rollNumber}
-					class="w-full rounded-xl border border-muted/30 bg-muted/40 px-4 py-3 font-mono text-[14px] font-bold text-foreground uppercase transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/30 focus:bg-muted/60"
-					placeholder="BMS10445"
-					autocomplete="off"
-				/>
-			</div>
-
-			<div class="space-y-5 pt-2">
-				<div class="space-y-2">
-					<label
-						for="pin"
-						class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
-					>
-						Create 4-Digit PIN
-					</label>
-					<input
-						id="pin"
-						type="password"
-						inputmode="numeric"
-						maxlength="4"
-						bind:value={pin}
-						class="w-full rounded-xl border border-muted/30 bg-muted/40 px-4 py-3 font-mono text-[20px] tracking-[0.4em] text-foreground transition-colors outline-none placeholder:text-foreground/20 focus:border-foreground/30 focus:bg-muted/60"
-						placeholder="••••"
-						autocomplete="new-password"
-					/>
-				</div>
-
-				<div class="space-y-2">
-					<div class="flex items-end justify-between">
-						<label
-							for="confirmPin"
-							class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
-						>
-							Confirm PIN
-						</label>
-						{#if pin.length === 4 && confirmPin.length > 0 && !isPinMatching}
-							<span class="text-[11px] font-bold text-destructive">Mismatch</span>
-						{/if}
-					</div>
-					<input
-						id="confirmPin"
-						type="password"
-						inputmode="numeric"
-						maxlength="4"
-						bind:value={confirmPin}
-						class="w-full rounded-xl border border-muted/30 bg-muted/40 px-4 py-3 font-mono text-[20px] tracking-[0.4em] text-foreground transition-colors outline-none placeholder:text-foreground/20 focus:border-foreground/30 focus:bg-muted/60 {pin.length ===
-							4 &&
-						confirmPin.length > 0 &&
-						!isPinMatching
-							? 'border-destructive/40 bg-destructive/5 text-destructive focus:border-destructive'
-							: ''}"
-						placeholder="••••"
-						autocomplete="new-password"
-					/>
-				</div>
-			</div>
-
-			<button
-				type="submit"
-				disabled={!isValid || isLoading}
-				class="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-[13px] font-bold text-background transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30"
-			>
-				{#if isLoading}
-					<Loader2 size={15} class="animate-spin" />
-					Creating Wallet...
-				{:else}
-					<Check size={15} />
-					Create Account
-				{/if}
-			</button>
-		</form>
-	</div>
-	<div class="mx-4 mt-auto rounded-2xl bg-accent/15 px-2 pt-4 pb-2 text-center">
-		<p class="mb-2 text-[10px] font-bold tracking-widest text-foreground/40 uppercase">
-			Alrady have an account?
-		</p>
-		<button
-			onclick={() => goto(resolve('/login'))}
-			class="w-full rounded-xl bg-background py-2 text-[13px] font-bold text-foreground transition-opacity active:opacity-60"
+		<div
+			class="animate-in fade-in mx-4 mt-auto rounded-2xl bg-accent/15 px-2 pt-4 pb-2 text-center duration-200"
 		>
-			Login →
-		</button>
-	</div>
+			<p class="mb-2 text-[10px] font-bold tracking-widest text-foreground/40 uppercase">
+				Already have an account?
+			</p>
+			<button
+				onclick={() => goto(resolve('/login'))}
+				class="w-full rounded-xl bg-background py-2 text-[13px] font-bold text-foreground transition-opacity active:opacity-60"
+			>
+				Login →
+			</button>
+		</div>
+	{:else}
+		<!-- SUCCESS STATE -->
+		<div
+			class="animate-in zoom-in-95 mt-12 flex flex-1 flex-col justify-center px-5 text-center duration-300"
+		>
+			<div
+				class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 ring-8 ring-amber-500/5"
+			>
+				<Clock size={28} strokeWidth={2.5} class="animate-pulse" />
+			</div>
+
+			<h2 class="mt-6 text-[20px] font-extrabold tracking-tight text-foreground">
+				Account Created Successfully!
+			</h2>
+			<p class="mt-2 text-[13px] leading-relaxed font-medium text-foreground/50">
+				Your profile details and ID card have been sent to our admin team for verification.
+			</p>
+
+			<div
+				class="mt-8 space-y-4 rounded-3xl border border-muted/30 bg-card p-5 text-left shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+			>
+				<p class="text-[10px] font-bold tracking-widest text-foreground/40 uppercase">
+					What happens next?
+				</p>
+
+				<div class="flex gap-3">
+					<div
+						class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary"
+					>
+						1
+					</div>
+					<p class="text-[12px] leading-normal font-semibold text-foreground/80">
+						An admin will review your ID photo to verify your account information.
+					</p>
+				</div>
+
+				<div class="flex gap-3">
+					<div
+						class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary"
+					>
+						2
+					</div>
+					<p class="text-[12px] leading-normal font-semibold text-foreground/80">
+						Your account status will automatically switch to <span
+							class="font-bold text-emerald-600">Active</span
+						> once approved.
+					</p>
+				</div>
+
+				<div class="flex gap-3">
+					<div
+						class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary"
+					>
+						3
+					</div>
+					<p class="text-[12px] leading-normal font-semibold text-foreground/80">
+						After activation, you can log in, add money to your wallet, and order food.
+					</p>
+				</div>
+			</div>
+
+			<div
+				class="mt-6 flex items-start gap-2.5 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-left"
+			>
+				<AlertCircle size={16} strokeWidth={2.5} class="mt-0.5 shrink-0 text-amber-600" />
+				<p class="text-[11px] leading-relaxed font-medium text-amber-700/90">
+					Please try logging in after <span class="font-bold">24 hours</span>. If your account is
+					still not active by then, please visit the physical support counter.
+				</p>
+			</div>
+
+			<div class="mt-8">
+				<button
+					onclick={() => goto(resolve('/login'))}
+					class="w-full rounded-xl bg-primary py-3.5 text-[13px] font-bold text-background shadow-md transition-all active:scale-95"
+				>
+					Go to Login Screen
+				</button>
+			</div>
+		</div>
+	{/if}
 </div>

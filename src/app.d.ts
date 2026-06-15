@@ -1,13 +1,13 @@
 declare global {
-  namespace App {
-    interface Locals {
-      user: {
-        id: string;
-        studentId: string;
-        name: string;
-      } | null;
-      sessionId: string | null;
-    }
-  }
+	namespace App {
+		interface Locals {
+			user: {
+				id: string;
+				referenceKey: string;
+				name: string;
+			} | null;
+			sessionId: string | null;
+		}
+	}
 }
 export {};

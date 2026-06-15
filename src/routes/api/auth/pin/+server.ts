@@ -45,8 +45,8 @@ export const POST: RequestHandler = async ({ request, locals, getClientAddress }
 		// Parse and Validate Input
 		const { currentPin, newPin } = await request.json();
 
-		if (!currentPin || !newPin || currentPin.length !== 4 || newPin.length !== 4) {
-			return json({ success: false, error: 'PINs must be exactly 4 digits' }, { status: 400 });
+		if (!currentPin || !newPin || currentPin.length !== 5 || newPin.length !== 5) {
+			return json({ success: false, error: 'PINs must be exactly 5 characters' }, { status: 400 });
 		}
 
 		// Log this attempt immediately (before checking if it's correct)
@@ -68,7 +68,7 @@ export const POST: RequestHandler = async ({ request, locals, getClientAddress }
 		}
 
 		// Verify the current PIN
-		const isValid = verifyPin(currentPin, user.pinHash);
+		const isValid = verifyPin(currentPin.toUpperCase(), user.pinHash);
 
 		if (!isValid) {
 			return json({ success: false, error: 'Incorrect current PIN' }, { status: 403 });
@@ -78,7 +78,7 @@ export const POST: RequestHandler = async ({ request, locals, getClientAddress }
 		await db.delete(loginAttempts).where(eq(loginAttempts.identifier, actionIdentifier));
 
 		// Hash and update the new PIN
-		const hashedNewPin = hashPin(newPin);
+		const hashedNewPin = hashPin(newPin.toUpperCase());
 
 		await db.update(users).set({ pinHash: hashedNewPin }).where(eq(users.id, userId));
 

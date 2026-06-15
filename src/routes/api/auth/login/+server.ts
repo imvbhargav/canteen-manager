@@ -63,8 +63,8 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
 		// Validate User against Database
 		const user = await db.query.users.findFirst({
 			where: or(
-				eq(users.studentId, normalizedIdentifier),
-				eq(users.rollNumber, normalizedIdentifier)
+				eq(users.accountNumber, normalizedIdentifier),
+				eq(users.referenceKey, normalizedIdentifier)
 			),
 			columns: {
 				id: true,
@@ -72,18 +72,31 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
 				isActive: true,
 				role: true,
 				name: true,
-				rollNumber: true
+				referenceKey: true,
+				deactivationReason: true
 			}
 		});
 
-		if (!user || !user.pinHash || !user.isActive) {
+		if (!user || !user.pinHash) {
 			return json(
 				{ success: false, error: 'Invalid credentials or account disabled' },
 				{ status: 401 }
 			);
 		}
 
-		const isValid = verifyPin(pin, user.pinHash);
+		if (!user.isActive) {
+			return json(
+				{
+					success: false,
+					error: `Account deactivated`,
+					isDeactivated: true,
+					reason: user.deactivationReason || 'No specific reason provided.'
+				},
+				{ status: 401 }
+			);
+		}
+
+		const isValid = verifyPin(pin.toUpperCase(), user.pinHash);
 
 		if (!isValid) {
 			return json({ success: false, error: 'Invalid credentials' }, { status: 401 });
@@ -114,7 +127,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
 
 		return json({
 			success: true,
-			data: { name: user.name, roll: user.rollNumber },
+			data: { name: user.name, id: user.referenceKey },
 			role: user.role,
 			message: 'Logged in successfully'
 		});

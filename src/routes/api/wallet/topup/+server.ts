@@ -44,19 +44,27 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
-		if (!adminData.pinHash || !verifyPin(pin, adminData.pinHash)) {
+		if (!adminData.pinHash || !verifyPin(pin.toUpperCase(), adminData.pinHash)) {
 			return json({ success: false, error: 'Invalid Admin PIN' }, { status: 403 });
 		}
 
 		const targetUser = await db.query.users.findFirst({
-			where: or(eq(users.studentId, identifier), eq(users.rollNumber, identifier)),
-			columns: { id: true, name: true, balance: true }
+			where: or(eq(users.referenceKey, identifier), eq(users.accountNumber, identifier)),
+			columns: { id: true, name: true, balance: true, isActive: true }
 		});
 
 		if (!targetUser) {
 			return json(
 				{ success: false, error: 'Student not found. Check ID/Roll Number.' },
 				{ status: 404 }
+			);
+		}
+
+		// Enforce ledger safety: block financial changes on inactive accounts
+		if (!targetUser.isActive) {
+			return json(
+				{ success: false, error: 'Cannot modify funds for an inactive user profile.' },
+				{ status: 400 }
 			);
 		}
 

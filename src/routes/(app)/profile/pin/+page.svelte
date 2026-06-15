@@ -11,8 +11,9 @@
 	let newPin = $state('');
 	let confirmPin = $state('');
 
+	// Updated: Match verification logic constraints against 5-digit alphanumeric keys
 	let isPinValid = $derived(
-		currentPin.length === 4 && newPin.length === 4 && newPin === confirmPin
+		currentPin.length === 5 && newPin.length === 5 && newPin === confirmPin
 	);
 
 	// Clear error message when the user starts typing to correct it
@@ -21,6 +22,16 @@
 			errorMessage = null;
 		}
 	});
+
+	// Sanitization utility to strip spaces and non-alphanumeric characters instantly
+	function handlePinInput(e: Event, currentField: 'current' | 'new' | 'confirm') {
+		const target = e.target as HTMLInputElement;
+		const sanitized = target.value.replace(/[^a-zA-Z0-9]/g, '');
+
+		if (currentField === 'current') currentPin = sanitized;
+		if (currentField === 'new') newPin = sanitized;
+		if (currentField === 'confirm') confirmPin = sanitized;
+	}
 
 	async function handleUpdatePin() {
 		if (!isPinValid || pinUpdateStatus !== 'IDLE') return;
@@ -42,7 +53,6 @@
 				setTimeout(() => goto(resolve('/profile')), 1000);
 			} else {
 				pinUpdateStatus = 'IDLE';
-				// Display the error returned from our API (e.g., "Incorrect current PIN")
 				errorMessage = data.error || 'Failed to update PIN';
 			}
 		} catch (err) {
@@ -74,7 +84,6 @@
 	</header>
 
 	<div class="space-y-6 px-5 pt-3">
-		<!-- ── User Profile Header ── -->
 		{#if appState.wallet}
 			<div class="flex items-center gap-4 px-1 pb-1">
 				<div
@@ -106,14 +115,17 @@
 					</label>
 					<input
 						id="current"
-						type="password"
-						inputmode="numeric"
-						maxlength="4"
-						bind:value={currentPin}
-						class="w-full rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3.5 text-center font-mono text-[24px] tracking-[0.5em] text-foreground transition-colors outline-none focus:border-foreground/50 focus:bg-card {errorMessage
+						type="text"
+						maxlength="5"
+						value={currentPin}
+						oninput={(e) => handlePinInput(e, 'current')}
+						class="w-full rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3.5 text-center font-mono text-[22px] tracking-[0.3em] text-foreground uppercase transition-colors outline-none focus:border-foreground/50 focus:bg-card {errorMessage
 							? 'border-destructive/50 bg-destructive/5 text-destructive focus:border-destructive'
 							: ''}"
-						placeholder="••••"
+						placeholder="•••••"
+						autocomplete="off"
+						autocorrect="off"
+						autocapitalize="off"
 					/>
 				</div>
 
@@ -128,12 +140,15 @@
 					</label>
 					<input
 						id="new"
-						type="password"
-						inputmode="numeric"
-						maxlength="4"
-						bind:value={newPin}
-						class="w-full rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3.5 text-center font-mono text-[24px] tracking-[0.5em] text-foreground transition-colors outline-none focus:border-foreground/50 focus:bg-card"
-						placeholder="••••"
+						type="text"
+						maxlength="5"
+						value={newPin}
+						oninput={(e) => handlePinInput(e, 'new')}
+						class="w-full rounded-[14px] border border-muted/40 bg-muted/10 px-4 py-3.5 text-center font-mono text-[22px] tracking-[0.3em] text-foreground uppercase transition-colors outline-none focus:border-foreground/50 focus:bg-card"
+						placeholder="•••••"
+						autocomplete="off"
+						autocorrect="off"
+						autocapitalize="off"
 					/>
 				</div>
 
@@ -146,18 +161,21 @@
 					</label>
 					<input
 						id="confirm"
-						type="password"
-						inputmode="numeric"
-						maxlength="4"
-						bind:value={confirmPin}
-						class="w-full rounded-[14px] border px-4 py-3.5 text-center font-mono text-[24px] tracking-[0.5em] transition-colors outline-none {confirmPin.length ===
-							4 && confirmPin !== newPin
+						type="text"
+						maxlength="5"
+						value={confirmPin}
+						oninput={(e) => handlePinInput(e, 'confirm')}
+						class="w-full rounded-[14px] border px-4 py-3.5 text-center font-mono text-[22px] tracking-[0.3em] uppercase transition-colors outline-none {confirmPin.length ===
+							5 && confirmPin !== newPin
 							? 'border-destructive/50 bg-destructive/5 text-destructive focus:border-destructive'
 							: 'border-muted/40 bg-muted/10 text-foreground focus:border-foreground/50 focus:bg-card'}"
-						placeholder="••••"
+						placeholder="•••••"
+						autocomplete="off"
+						autocorrect="off"
+						autocapitalize="off"
 					/>
 
-					{#if confirmPin.length === 4 && confirmPin !== newPin}
+					{#if confirmPin.length === 5 && confirmPin !== newPin}
 						<p
 							class="mt-2 text-center text-[10px] font-bold tracking-widest text-destructive uppercase"
 						>

@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { users } from '$lib/server/db/schema';
-import { and, lt, desc, or, ilike } from 'drizzle-orm';
+import { and, lt, desc, or, ilike, not, eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals, url }) => {
@@ -24,8 +24,8 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			conditions.push(
 				or(
 					ilike(users.name, searchPattern),
-					ilike(users.rollNumber, searchPattern),
-					ilike(users.studentId, searchPattern)
+					ilike(users.accountNumber, searchPattern),
+					ilike(users.referenceKey, searchPattern)
 				)
 			);
 		}
@@ -38,14 +38,14 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
 		const userRecords = await db.query.users.findMany({
-			where: whereClause,
+			where: and(whereClause, not(eq(users.role, 'ADMIN'))),
 			orderBy: [desc(users.createdAt)],
 			limit: limit + 1,
 			columns: {
 				id: true,
-				studentId: true,
 				name: true,
-				rollNumber: true,
+				referenceKey: true,
+				accountNumber: true,
 				role: true,
 				balance: true,
 				isActive: true,

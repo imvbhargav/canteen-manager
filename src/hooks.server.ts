@@ -23,7 +23,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		),
 		with: {
 			user: {
-				columns: { id: true, studentId: true, name: true, isActive: true }
+				columns: { id: true, referenceKey: true, name: true, isActive: true }
 			}
 		}
 	});
@@ -31,7 +31,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (sessionRecord && sessionRecord.user && sessionRecord.user.isActive) {
 		event.locals.user = {
 			id: sessionRecord.user.id,
-			studentId: sessionRecord.user.studentId,
+			referenceKey: sessionRecord.user.referenceKey,
 			name: sessionRecord.user.name
 		};
 		event.locals.sessionId = sessionRecord.id;

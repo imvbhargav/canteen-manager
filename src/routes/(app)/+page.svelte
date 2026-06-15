@@ -165,7 +165,7 @@
 			<h2 class="font-site-name text-3xl font-black">
 				Welcome <span class="text-primary">{appState.wallet.name.split(' ')[0]}!</span> 👋
 			</h2>
-			<p class="px-1 text-sm text-foreground/50">{appState.wallet.studentId}</p>
+			<p class="px-1 text-sm text-foreground/50">{appState.wallet.referenceKey}</p>
 		</div>
 
 		<div class="px-5 pt-5">
@@ -315,7 +315,7 @@
 							<UtensilsCrossed size={12} strokeWidth={2.5} />
 							Full Menu
 						</p>
-						<h2 class="font-outfit mt-2 text-2xl leading-tight font-bold tracking-tight text-white">
+						<h2 class="mt-2 font-outfit text-2xl leading-tight font-bold tracking-tight text-white">
 							Fresh. Wholesome. Everyday
 						</h2>
 						<p class="mt-2 text-[14px] leading-relaxed font-medium text-white/55">

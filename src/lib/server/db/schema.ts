@@ -54,17 +54,32 @@ export const users = pgTable(
 	'users',
 	{
 		id: uuid('id').defaultRandom().primaryKey(),
-		studentId: text('student_id').notNull().unique(),
 		name: text('name').notNull(),
-		rollNumber: text('roll_number').notNull().unique(),
+
+		// Generic Identification Columns
+		accountNumber: text('account_number').notNull().unique(),
+		referenceKey: text('reference_key').notNull().unique(),
+
 		role: userRoleEnum('role').default('STUDENT').notNull(),
 		balance: numeric('balance', { precision: 10, scale: 2 }).notNull().default('0.00'),
 		pinHash: text('pin_hash'),
 		isActive: boolean('is_active').default(true).notNull(),
+		deactivationReason: text('deactivation_reason'),
+
+		// Account expiry and validations
+		credentialPhotoUrl: text('credential_photo_url'),
+		batchYear: integer('batch_year').notNull().default(new Date().getFullYear()),
+		expectedGraduationYear: integer('expected_graduation_year')
+			.notNull()
+			.default(new Date().getFullYear()),
+
 		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 	},
-	(table) => [check('users_balance_check', sql`${table.balance} >= 0`)]
+	(table) => [
+		// Keeps your critical database-level safety check intact
+		check('users_balance_check', sql`${table.balance} >= 0`)
+	]
 );
 
 export const userSessions = pgTable('user_sessions', {

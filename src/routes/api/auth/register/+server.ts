@@ -3,51 +3,77 @@ import { db } from '$lib/server/db';
 import { users, userSessions } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { hashPin, generateSessionToken, hashSessionToken } from '$lib/server/auth';
+import { IMAGE_STORAGE_PROVIDER, R2_PUBLIC_DOMAIN } from '$env/static/private';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	try {
-		const { name, rollNumber, pin, deviceIdentifier = 'Web App' } = await request.json();
+		const {
+			name,
+			accountNumber,
+			pin,
+			credentialImage, // Captures either the R2 object fileKey path or the Cloudinary URL
+			deviceIdentifier = 'Web App'
+		} = await request.json();
 
-		if (!name || !rollNumber || !pin) {
-			return json({ success: false, error: 'All fields are required' }, { status: 400 });
+		if (!name || !accountNumber || !pin || !credentialImage) {
+			return json(
+				{ success: false, error: 'All fields including ID verification are required' },
+				{ status: 400 }
+			);
 		}
 
-		if (pin.length !== 4) {
-			return json({ success: false, error: 'PIN must be exactly 4 digits' }, { status: 400 });
+		const cleanAccount = accountNumber.trim().toUpperCase();
+		const cleanPin = pin.trim().toUpperCase();
+
+		const alphanumericRegex = /^[A-Z0-9]+$/;
+		if (!alphanumericRegex.test(cleanAccount)) {
+			return json(
+				{ success: false, error: 'Account Number must contain only letters and numbers' },
+				{ status: 400 }
+			);
+		}
+		if (cleanPin.length !== 5 || !alphanumericRegex.test(cleanPin)) {
+			return json(
+				{ success: false, error: 'PIN must be exactly 5 alphanumeric characters' },
+				{ status: 400 }
+			);
 		}
 
-		// Check for existing user by Roll Number only to prevent duplicates
 		const existingUser = await db.query.users.findFirst({
-			where: eq(users.rollNumber, rollNumber)
+			where: eq(users.accountNumber, cleanAccount)
 		});
 
 		if (existingUser) {
-			return json({ success: false, error: 'Roll Number already registered' }, { status: 409 });
+			return json({ success: false, error: 'Account Number already registered' }, { status: 409 });
 		}
 
-		// Generate readable Student ID based on the current year and roll number
-		// Example: NAMBMS10445
-		const generatedStudentId = `${name.slice(0, 3).toUpperCase()}${rollNumber.toUpperCase()}`;
+		const generatedReferenceKey = `${name
+			.replace(/[^a-zA-Z]/g, '')
+			.slice(0, 3)
+			.toUpperCase()}${cleanAccount}`;
+		const hashedPin = hashPin(cleanPin);
 
-		// Hash the PIN securely using the utility from auth.ts
-		const hashedPin = hashPin(pin);
+		// Normalize string target context based on our chosen backend system architecture
+		let finalCredentialUrl = credentialImage;
+		if (IMAGE_STORAGE_PROVIDER === 'R2') {
+			finalCredentialUrl = `${R2_PUBLIC_DOMAIN.replace(/\/$/, '')}/${credentialImage}`;
+		}
 
-		// Create the user in the database inside a transaction
 		const result = await db.transaction(async (tx) => {
 			const [newUser] = await tx
 				.insert(users)
 				.values({
-					name,
-					studentId: generatedStudentId.toUpperCase(),
-					rollNumber: rollNumber.toUpperCase(),
+					name: name.trim(),
+					referenceKey: generatedReferenceKey,
+					accountNumber: cleanAccount,
 					pinHash: hashedPin,
-					balance: '0.00', // Initialize with zero balance
-					isActive: true
+					credentialPhotoUrl: finalCredentialUrl,
+					isActive: false,
+					deactivationReason: 'verification'
 				})
 				.returning();
 
-			// Generate and store session
 			const sessionToken = generateSessionToken();
 			const tokenHash = hashSessionToken(sessionToken);
 
@@ -62,7 +88,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			return { user: newUser, sessionToken };
 		});
 
-		// Set the secure HttpOnly cookie
 		cookies.set('session_id', result.sessionToken, {
 			path: '/',
 			httpOnly: true,
@@ -71,7 +96,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			maxAge: 60 * 60 * 24 * 7
 		});
 
-		return json({ success: true, message: 'Account created successfully' });
+		return json({ success: true, message: 'Account registered and awaiting admin activation' });
 	} catch (error: unknown) {
 		console.error('Registration error:', error);
 		return json({ success: false, error: 'Failed to create account' }, { status: 500 });

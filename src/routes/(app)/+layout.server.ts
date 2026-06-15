@@ -19,11 +19,11 @@ export const load: LayoutServerLoad = async ({ locals, setHeaders }) => {
 	const user = await db.query.users.findFirst({
 		where: eq(users.id, locals.user.id),
 		columns: {
-			studentId: true,
 			name: true,
-			rollNumber: true,
 			balance: true,
-			role: true // 1. Must fetch the role to check it
+			role: true,
+			accountNumber: true,
+			referenceKey: true
 		}
 	});
 
@@ -31,12 +31,12 @@ export const load: LayoutServerLoad = async ({ locals, setHeaders }) => {
 		throw redirect(302, '/login');
 	}
 
-	// 2. Intercept Admins and send them to their console immediately
+	// Intercept Admins and send them to their console immediately
 	if (user.role === 'ADMIN') {
 		throw redirect(302, '/admin');
 	}
 
-	// 3. Only standard students proceed to fetch the menu
+	// Only standard students proceed to fetch the menu
 	const menu = await db.query.menuItems.findMany({
 		where: and(eq(menuItems.isArchived, false), eq(menuItems.inStock, true)),
 		orderBy: (menuItems, { asc }) => [asc(menuItems.category), asc(menuItems.name)]
@@ -44,9 +44,9 @@ export const load: LayoutServerLoad = async ({ locals, setHeaders }) => {
 
 	return {
 		wallet: {
-			studentId: user.studentId,
 			name: user.name,
-			rollNumber: user.rollNumber,
+			accountNumber: user.accountNumber,
+			referenceKey: user.referenceKey,
 			balance: Number(user.balance)
 		},
 		menuItems: menu.map((item) => ({

@@ -121,12 +121,7 @@
 							<span
 								class="rounded-md bg-muted/50 px-2 py-0.5 text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
 							>
-								{appState.wallet.studentId}
-							</span>
-							<span
-								class="rounded-md bg-muted/50 px-2 py-0.5 text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
-							>
-								{appState.wallet.rollNumber}
+								{appState.wallet.referenceKey}
 							</span>
 						</div>
 					</div>

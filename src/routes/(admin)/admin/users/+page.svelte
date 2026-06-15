@@ -4,13 +4,21 @@
 	import { resolve } from '$app/paths';
 	import AppLogo from '$lib/components/AppLogo.svelte';
 	import { formatCurrencyINR } from '$lib';
-	import { Search, Loader2, LogOut, ShieldCheck, User as UserIcon } from 'lucide-svelte';
+	import {
+		Search,
+		Loader2,
+		LogOut,
+		ShieldCheck,
+		User as UserIcon,
+		Users,
+		Wallet
+	} from 'lucide-svelte';
 
 	type UserRecord = {
 		id: string;
-		studentId: string;
 		name: string;
-		rollNumber: string;
+		referenceKey: string;
+		accountNumber: string;
 		role: string;
 		balance: string | number;
 		isActive: boolean;
@@ -22,11 +30,29 @@
 	let isLoadingMore: boolean = $state(false);
 	let isLoggingOut: boolean = $state(false);
 
+	// Stats State Variables
+	let totalUsers: number = $state(0);
+	let totalBalance: string | number = $state(0);
+
 	let searchQuery: string = $state('');
 	let nextCursor: string | null = $state(null);
 	let hasNextPage: boolean = $state(false);
 
 	let searchTimeout: ReturnType<typeof setTimeout>;
+
+	// Fetch Aggregated Dashboard Metrics
+	async function fetchStats(): Promise<void> {
+		try {
+			const response = await fetch(resolve('/api/admin/users/stats'));
+			const result = await response.json();
+			if (result.success) {
+				totalUsers = result.data.totalUsers;
+				totalBalance = result.data.totalBalance;
+			}
+		} catch (err) {
+			console.error('Failed to load wallet stats', err);
+		}
+	}
 
 	// Fetch Users with optional cursor and search reset
 	async function fetchUsers(cursor: string | null = null, reset: boolean = false): Promise<void> {
@@ -35,7 +61,7 @@
 			usersList = [];
 		}
 
-		const url = new URL('/api/users', window.location.origin);
+		const url = new URL(resolve('/api/admin/users'), window.location.origin);
 		url.searchParams.set('limit', '15');
 		if (cursor) url.searchParams.set('cursor', cursor);
 		if (searchQuery.trim()) url.searchParams.set('search', searchQuery.trim());
@@ -96,6 +122,7 @@
 	}
 
 	onMount(() => {
+		fetchStats(); // Fetch totals numbers
 		fetchUsers(null, true);
 	});
 
@@ -146,9 +173,41 @@
 		</div>
 	</header>
 
-	<div class="flex-1 space-y-6 px-5 pt-4 pb-10">
+	<div class="flex-1 space-y-6 overflow-y-auto px-5 pt-4 pb-10">
 		<div class="space-y-4">
 			<h3 class="text-[17px] font-bold tracking-tight text-foreground">User Management</h3>
+
+			<div class="grid grid-cols-2 gap-3.5">
+				<div
+					class="rounded-[22px] border border-muted/30 bg-card p-4 shadow-[0_2px_12px_rgba(0,0,0,0.02)]"
+				>
+					<div
+						class="mb-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary"
+					>
+						<Users size={16} strokeWidth={2.5} />
+					</div>
+					<p class="text-[11px] font-bold tracking-wider text-foreground/40 uppercase">
+						Total Users
+					</p>
+					<p class="mt-0.5 font-mono text-xl font-bold text-foreground">{totalUsers}</p>
+				</div>
+
+				<div
+					class="rounded-[22px] border border-muted/30 bg-card p-4 shadow-[0_2px_12px_rgba(0,0,0,0.02)]"
+				>
+					<div
+						class="mb-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500"
+					>
+						<Wallet size={16} strokeWidth={2.5} />
+					</div>
+					<p class="text-[11px] font-bold tracking-wider text-foreground/40 uppercase">
+						Total in Wallets
+					</p>
+					<p class="mt-0.5 font-mono text-xl font-bold text-foreground">
+						{formatCurrencyINR(Number(totalBalance))}
+					</p>
+				</div>
+			</div>
 
 			<div class="relative">
 				<Search
@@ -210,8 +269,7 @@
 								<p
 									class="mt-0.5 truncate font-mono text-[11px] font-bold tracking-wider text-foreground/40 uppercase"
 								>
-									{user.rollNumber} <span class="mx-1 opacity-50">•</span>
-									{user.studentId}
+									{user.referenceKey}
 								</p>
 							</div>
 						</div>
