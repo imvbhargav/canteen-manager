@@ -366,9 +366,13 @@
 									<div
 										class="absolute inset-0 z-10 bg-linear-to-b from-background/25 to-background"
 									></div>
-									<h1 class="text-center text-[70px] leading-none font-black opacity-80">
-										Pepper<span class="text-primary">Vine</span>
-									</h1>
+									<div class="mx-auto w-full max-w-md">
+										<h1
+											class="block w-full text-center text-[clamp(2.8rem,15.5vw,4.25rem)] leading-none font-black tracking-tighter opacity-85 select-none"
+										>
+											Pepper<span class="text-primary">Vine</span>
+										</h1>
+									</div>
 								</div>
 								<p class="text-right text-foreground/50">Hospitality</p>
 							</div>
