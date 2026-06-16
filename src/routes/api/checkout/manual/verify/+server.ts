@@ -7,10 +7,11 @@ import {
 	ticketItems,
 	walletTransactions,
 	menuItems,
-	counters // Added counters import to fetch active units
+	counters
 } from '$lib/server/db/schema';
 import type { RequestHandler } from './$types';
 import { eq, and, gt } from 'drizzle-orm';
+import { generateTicketReference } from '$lib';
 
 interface CartItem {
 	menuItemId: string;
@@ -103,7 +104,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				.set({ balance: updatedBalance, updatedAt: new Date() })
 				.where(eq(users.id, activeUserId));
 
-			const ticketReference = `MAN-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+			const ticketReference: string = generateTicketReference();
 
 			// 2. Insert ticket utilizing the dynamically resolved counter ID string
 			const [ticket] = await tx

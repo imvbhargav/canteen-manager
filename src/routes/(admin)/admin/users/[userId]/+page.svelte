@@ -271,7 +271,7 @@
 		otpError = '';
 		generatedOtp = '';
 		try {
-			const res: Response = await fetch('/api/qr/manual/generate', {
+			const res: Response = await fetch('/api/checkout/manual/generate', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ userId: userId })

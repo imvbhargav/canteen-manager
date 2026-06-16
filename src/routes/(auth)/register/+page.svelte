@@ -476,7 +476,7 @@
 							for="pin"
 							class="block text-[10px] font-bold tracking-widest text-foreground/60 uppercase"
 						>
-							Create PIN
+							Create PIN (5 Characters)
 						</label>
 						<input
 							id="pin"

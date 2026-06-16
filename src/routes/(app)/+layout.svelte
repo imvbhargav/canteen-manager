@@ -2,7 +2,7 @@
 	import '../layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/stores';
-	import { Home, UtensilsCrossed, QrCode, X, Download, WifiOff, Box } from 'lucide-svelte';
+	import { Home, UtensilsCrossed, QrCode, X, Download, WifiOff, User } from 'lucide-svelte';
 	import { appState } from '$lib/store.svelte';
 	import { resolve } from '$app/paths';
 	import type { UserWallet, MenuItem } from '$lib/types';
@@ -60,7 +60,7 @@
 		{ path: resolve('/'), icon: Home, label: 'Home' },
 		{ path: resolve('/menu'), icon: UtensilsCrossed, label: 'Menu' },
 		{ path: resolve('/ticket'), icon: QrCode, label: 'Ticket' },
-		{ path: resolve('/orders'), icon: Box, label: 'Orders' }
+		{ path: resolve('/profile'), icon: User, label: 'Profile' }
 	];
 
 	let currentPath = $derived($page.url.pathname);

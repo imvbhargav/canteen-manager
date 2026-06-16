@@ -14,6 +14,7 @@ import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 import { decryptCounterData } from '$lib/crypto';
 import Pusher from 'pusher';
+import { generateTicketReference } from '$lib';
 
 const pusher: Pusher = new Pusher({
 	appId: env.PUSHER_APP_ID as string,
@@ -43,17 +44,6 @@ interface ReceiptItem {
 	itemTotal: string;
 }
 
-const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
-function generateTicketReference(): string {
-	const letters = Array.from(
-		{ length: 3 },
-		() => LETTERS[Math.floor(Math.random() * LETTERS.length)]
-	).join('');
-	const digits = String(Math.floor(1000 + Math.random() * 9000));
-	return `${letters}${digits}`;
-}
-
 export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!locals.user) {
 		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -75,27 +65,39 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	try {
-		let counterId: string = securePayload;
-
-		if (securePayload !== 'MANUAL_FALLBACK') {
-			const decrypted: string | null = decryptCounterData(securePayload);
-			if (!decrypted) {
-				return json({ success: false, error: 'Invalid or tampered QR code' }, { status: 400 });
-			}
-			counterId = decrypted;
+		// Decrypt payload to extract counter ID
+		const counterId: string | null = decryptCounterData(securePayload);
+		if (!counterId) {
+			return json({ success: false, error: 'Invalid or tampered QR code' }, { status: 400 });
 		}
 
-		if (counterId !== 'MANUAL_FALLBACK') {
-			const counter = await db.query.counters.findFirst({
-				where: eq(counters.id, counterId)
-			});
+		// Fetch counter state from DB
+		const counter = await db.query.counters.findFirst({
+			where: eq(counters.id, counterId)
+		});
 
-			if (!counter || counter.status !== 'ACTIVE') {
-				return json(
-					{ success: false, error: 'This counter is temporarily out of service' },
-					{ status: 400 }
-				);
+		if (!counter) {
+			return json({ success: false, error: 'Counter not found' }, { status: 404 });
+		}
+
+		// Handle structural or functional master switch status
+		if (!counter.isActive) {
+			return json(
+				{ success: false, error: `Counter ${counter.displayName} is deactivated.` },
+				{ status: 400 }
+			);
+		}
+
+		// Handle nuanced counter statuses explicitly based on enum definitions
+		if (counter.status !== 'ACTIVE') {
+			let reason = 'This counter is currently unavailable';
+			if (counter.status === 'OFFLINE') {
+				reason = `Counter ${counter.displayName} is currently offline.`;
+			} else if (counter.status === 'PRINTER_ISSUE') {
+				reason = `Counter ${counter.displayName} is facing hardware/printer problems.`;
 			}
+
+			return json({ success: false, error: reason }, { status: 400 });
 		}
 
 		const itemIds: string[] = cart.map((item: CartItem) => item.id);
@@ -167,22 +169,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return newTicket;
 		});
 
-		if (counterId !== 'MANUAL_FALLBACK') {
-			const receiptItems: ReceiptItem[] = validatedItems.map((item: ValidatedItem) => ({
-				name: item.name,
-				quantity: item.quantity,
-				unitPrice: item.unitPrice,
-				itemTotal: item.itemTotal
-			}));
+		const receiptItems: ReceiptItem[] = validatedItems.map((item: ValidatedItem) => ({
+			name: item.name,
+			quantity: item.quantity,
+			unitPrice: item.unitPrice,
+			itemTotal: item.itemTotal
+		}));
 
-			await pusher.trigger([`counter-${counterId}`, 'admin-orders'], 'NEW_ORDER', {
-				orderId: result.id,
-				counterId: counterId,
-				ticketReference: result.ticketReference,
-				netTotal: serverTotal.toFixed(2),
-				items: receiptItems
-			});
-		}
+		await pusher.trigger([`counter-${counterId}`, 'admin-orders'], 'NEW_ORDER', {
+			orderId: result.id,
+			counterId: counterId,
+			ticketReference: result.ticketReference,
+			netTotal: serverTotal.toFixed(2),
+			items: receiptItems
+		});
 
 		return json({
 			success: true,

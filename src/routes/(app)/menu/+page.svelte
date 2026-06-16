@@ -108,9 +108,9 @@
 <svelte:head><title>Order Food | MunchUp</title></svelte:head>
 
 <div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
-	<!-- ── Header ──────────────────────────────────────────────────────────── -->
+	<!-- ── Header ── -->
 	<header
-		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 border-b border-muted/20 bg-background/80 px-5 backdrop-blur-md"
+		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
 	>
 		<a
 			href={resolve('/')}
@@ -120,125 +120,126 @@
 		</a>
 
 		<div class="flex-1">
-			<h2 class="text-[20px] leading-none font-bold tracking-tight text-foreground">Menu</h2>
+			<h2 class="text-[20px] font-bold tracking-tight text-foreground">Menu</h2>
 			{#if activeCategory !== 'All'}
 				<p class="mt-0.5 text-[11px] font-medium text-foreground/40">{activeCategory}</p>
 			{/if}
 		</div>
 
-		<!-- Cart pill -->
+		<!-- Cart pill indicator -->
 		<div class="flex w-20 justify-end">
 			{#if itemCount > 0}
-				<div class="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5">
-					<ShoppingBag size={15} strokeWidth={2.5} class="text-primary" />
-					<span class="text-[13px] font-bold text-primary">{itemCount}</span>
+				<div
+					class="animate-in zoom-in-95 flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 ring-1 ring-primary/20"
+				>
+					<ShoppingBag size={14} strokeWidth={2.5} class="text-primary" />
+					<span class="text-[13px] font-black text-primary tabular-nums">{itemCount}</span>
 				</div>
 			{/if}
 		</div>
 	</header>
 
-	<!-- ── Category filter tabs ────────────────────────────────────────────── -->
+	<!-- ── Category filter tabs ── -->
 	<div
-		class="flex shrink-0 scrollbar-none gap-2 overflow-x-auto border-b border-muted/15 px-5 py-3"
+		class="flex shrink-0 scrollbar-none gap-2 overflow-x-auto border-b border-muted/10 px-5 py-3"
 	>
 		{#each ['All', ...categoryOrder] as cat (cat)}
 			<button
 				onclick={() => (activeCategory = cat)}
-				class="shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-all duration-150 active:scale-95
-				{activeCategory === cat
-					? 'bg-primary text-background shadow-sm'
-					: 'bg-muted/50 text-foreground/55 hover:bg-muted hover:text-foreground'}"
+				class="shrink-0 rounded-full px-4 py-1.5 text-[13px] font-bold tracking-tight transition-all duration-150 active:scale-95
+                {activeCategory === cat
+					? 'bg-primary text-background shadow-[0_2px_8px_rgba(var(--primary),0.15)]'
+					: 'bg-muted/40 text-foreground/50 hover:bg-muted/70 hover:text-foreground'}"
 			>
 				{cat}
 			</button>
 		{/each}
 	</div>
 
-	<!-- ── Menu list ───────────────────────────────────────────────────────── -->
-	<!--
-		Bottom padding is always pb-36 regardless of whether the checkout bar is
-		visible, so the list doesn't jump when it appears / disappears.
-	-->
-	<div class="flex-1 overflow-y-auto pb-36">
+	<!-- ── Menu list ── -->
+	<div class="flex-1 overflow-y-auto pb-42">
 		{#each filteredMenu() as group (group.category)}
-			<div class="px-5 pt-4 pb-6">
+			<div class="px-5 pt-4 pb-2">
 				<!-- Section header -->
-				<div class="mb-3 flex items-center gap-3">
-					<h3 class="text-[12px] font-bold tracking-[0.07em] text-foreground/35 uppercase">
+				<div class="mb-3 flex items-center gap-3 px-4">
+					<h3 class="text-[11px] font-black tracking-[0.12em] text-foreground/35 uppercase">
 						{group.category}
 					</h3>
-					<div class="h-px flex-1 bg-muted/35"></div>
-					<span class="text-[11px] font-medium text-foreground/25">
+					<div class="h-px flex-1 bg-muted/20"></div>
+					<span class="text-[10px] font-bold tracking-wider text-foreground/25 uppercase">
 						{group.items.length}
 						{group.items.length === 1 ? 'item' : 'items'}
 					</span>
 				</div>
 
-				<!-- Item card -->
+				<!-- Card container -->
 				<div
-					class="overflow-hidden rounded-[22px] border border-muted/25 bg-card shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+					class="space-y-1 overflow-hidden rounded-3xl border border-muted bg-card p-2 shadow-[0_2px_12px_rgb(0,0,0,0.02)]"
 				>
-					{#each group.items as item, i (item.id)}
+					{#each group.items as item (item.id)}
 						{@const qty = getQty(item.id)}
 						<div
-							class="flex items-center gap-4 px-4 py-4 transition-colors duration-100
-							{qty > 0 ? 'bg-primary/2' : ''}
-							{i < group.items.length - 1 ? 'border-b border-muted/20' : ''}"
+							class="group flex items-center gap-4 rounded-2xl p-3 text-left transition-all duration-150
+                            {qty > 0 ? 'bg-primary/5 ring-1 ring-primary/10' : 'hover:bg-muted/30'}"
 						>
-							<!-- Veg / non-veg dot -->
+							<!-- Veg / non-veg marker badge -->
 							<div
-								class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center self-start rounded-sm border-2
-								{item.dietary === 'veg' ? 'border-emerald-500' : 'border-red-500'}"
+								class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center self-start rounded border
+                                {item.dietary === 'veg'
+									? 'border-emerald-500/50 bg-emerald-500/5'
+									: 'border-rose-500/50 bg-rose-500/5'}"
 							>
 								<div
 									class="h-1.5 w-1.5 rounded-full
-									{item.dietary === 'veg' ? 'bg-emerald-500' : 'bg-red-500'}"
+                                    {item.dietary === 'veg' ? 'bg-emerald-500' : 'bg-rose-500'}"
 								></div>
 							</div>
 
-							<!-- Item info -->
+							<!-- Item descriptions metrics -->
 							<div class="min-w-0 flex-1">
-								<h4 class="text-[15px] leading-snug font-semibold text-foreground">{item.name}</h4>
-								<p class="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-foreground/40">
+								<h4 class="text-[15px] leading-snug font-bold tracking-tight text-foreground">
+									{item.name}
+								</h4>
+								<p class="mt-0.5 line-clamp-2 pr-2 text-[12px] leading-relaxed text-foreground/45">
 									{item.description}
 								</p>
-								<span class="mt-1.5 block font-mono text-[14px] font-bold text-accent"
+								<span class="mt-2 block font-mono text-[14px] font-bold tracking-tight text-accent"
 									>{formatCurrencyINR(item.price)}</span
 								>
 							</div>
 
-							<!--
-								Stepper container: fixed width so the text column never
-								shifts when the + button becomes a stepper pill.
-							-->
-							<div class="flex w-22 shrink-0 items-center justify-end">
+							<!-- Stepper component wrapper -->
+							<div class="flex w-24 shrink-0 items-center justify-end">
 								{#if qty > 0}
-									<div class="flex items-center gap-0.5 rounded-full bg-primary/8 p-1">
+									<div
+										class="flex items-center gap-1 rounded-full bg-card p-1 shadow-sm ring-1 ring-muted/80"
+									>
 										<button
 											onclick={() => removeFromCart(item)}
 											aria-label="Remove one {item.name}"
-											class="flex h-7 w-7 items-center justify-center rounded-full bg-card text-foreground shadow-sm transition-transform active:scale-90"
+											class="flex h-7 w-7 items-center justify-center rounded-full bg-muted/40 text-foreground transition-all active:scale-85 active:bg-muted/80"
 										>
-											<Minus size={13} strokeWidth={2.5} />
+											<Minus size={12} strokeWidth={3} />
 										</button>
-										<span class="w-7 text-center text-[13px] font-bold text-foreground tabular-nums"
+										<span
+											class="w-6 text-center text-[13px] font-black text-foreground tabular-nums"
 											>{qty}</span
 										>
 										<button
 											onclick={() => addToCart(item)}
 											aria-label="Add one more {item.name}"
-											class="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-transform active:scale-90"
+											class="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-background shadow-sm transition-all active:scale-85 active:bg-primary/90"
 										>
-											<Plus size={13} strokeWidth={2.5} />
+											<Plus size={12} strokeWidth={3} />
 										</button>
 									</div>
 								{:else}
 									<button
 										onclick={() => addToCart(item)}
 										aria-label="Add {item.name} to cart"
-										class="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-all duration-150 active:scale-90 active:bg-primary/20"
+										class="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-foreground transition-all hover:bg-primary hover:text-background active:scale-90"
 									>
-										<Plus size={18} strokeWidth={2.5} />
+										<Plus size={16} strokeWidth={2.5} />
 									</button>
 								{/if}
 							</div>
@@ -248,45 +249,42 @@
 			</div>
 		{/each}
 
-		<!-- Empty state when a category has no items -->
+		<!-- Empty category state layout -->
 		{#if filteredMenu().length === 0}
-			<div class="flex flex-col items-center justify-center px-8 py-24 text-center">
-				<div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted/60">
-					<ShoppingBag size={22} strokeWidth={1.75} class="text-foreground/30" />
+			<div
+				class="animate-in fade-in dynamic-duration flex flex-col items-center justify-center px-8 py-28 text-center"
+			>
+				<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted/40">
+					<ShoppingBag size={20} strokeWidth={2} class="text-foreground/30" />
 				</div>
-				<p class="text-[15px] font-semibold text-foreground/50">Nothing here yet</p>
-				<p class="mt-1 text-[13px] text-foreground/30">
-					Check back later for {activeCategory} options.
+				<p class="text-[14px] font-bold tracking-tight text-foreground/50">No Items Available</p>
+				<p class="mt-0.5 max-w-50 text-[12px] text-foreground/30">
+					Check back soon for available selections in {activeCategory}.
 				</p>
 			</div>
 		{/if}
 	</div>
 
-	<!-- ── Checkout bar ────────────────────────────────────────────────────── -->
+	<!-- ── Floating bottom checkout bar ── -->
 	{#if total > 0}
 		<div
-			class="animate-in slide-in-from-bottom-2 absolute right-0 bottom-0 left-0 z-30 px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] duration-200"
+			class="animate-in slide-in-from-bottom-6 absolute right-0 bottom-0 left-0 z-30 px-4 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] duration-300"
 		>
 			<div
-				class="relative overflow-hidden rounded-[26px] bg-background/75 shadow-[0_-1px_0_rgba(0,0,0,0.06),0_8px_32px_rgba(0,0,0,0.14)] ring-1 ring-black/5 backdrop-blur-2xl backdrop-saturate-150 dark:bg-background/60 dark:ring-white/8"
+				class="relative overflow-hidden rounded-[28px] border border-muted bg-card/75 shadow-[0_12px_40px_rgba(0,0,0,0.12)] backdrop-blur-xl backdrop-saturate-150"
 			>
-				<!-- Specular highlight -->
-				<div
-					class="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/60 dark:bg-white/15"
-				></div>
-
-				<div class="flex items-center justify-between px-5 pt-4 pb-2">
+				<div class="flex items-center justify-between px-5 pt-4 pb-2.5">
 					<div>
-						<p class="text-[10px] font-bold tracking-[0.14em] text-foreground/40 uppercase">
+						<p class="text-[10px] font-black tracking-[0.14em] text-foreground/40 uppercase">
 							Order Total
 						</p>
 						{#if insufficientBalance}
-							<p class="mt-0.5 font-mono text-[11px] font-semibold text-destructive">
-								Balance: {formatCurrencyINR(appState.wallet?.balance ?? 0)}
+							<p class="mt-0.5 font-mono text-[11px] font-bold tracking-tight text-destructive">
+								Balance shortfall: {formatCurrencyINR(appState.wallet?.balance ?? 0)}
 							</p>
 						{/if}
 					</div>
-					<span class="font-mono text-[24px] font-bold tracking-tight text-foreground tabular-nums">
+					<span class="font-mono text-2xl font-bold tracking-tight text-foreground tabular-nums">
 						{formatCurrencyINR(total)}
 					</span>
 				</div>
@@ -296,9 +294,9 @@
 						disabled={insufficientBalance}
 						onclick={handleCheckout}
 						class="w-full rounded-full py-3.5 text-[15px] font-bold tracking-wide transition-all active:scale-[0.98]
-						{insufficientBalance
+                        {insufficientBalance
 							? 'cursor-not-allowed bg-muted text-foreground/30'
-							: 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'}"
+							: 'bg-primary text-background shadow-lg shadow-primary/20 active:opacity-95'}"
 					>
 						{#if insufficientBalance}
 							Insufficient Balance

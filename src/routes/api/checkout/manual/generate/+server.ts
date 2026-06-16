@@ -52,7 +52,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			expiresAt: expiresAt.toISOString(),
 			targetUser: {
 				name: targetUser.name,
-				rollNumber: targetUser.rollNumber
+				rollNumber: targetUser.accountNumber
 			}
 		});
 	} catch (error) {

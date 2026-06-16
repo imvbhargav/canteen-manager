@@ -132,6 +132,8 @@
 	}
 </script>
 
+<svelte:head><title>User Status | MunchUp Admin</title></svelte:head>
+
 <div
 	class="animate-in fade-in absolute inset-0 z-30 flex flex-col bg-background duration-200 select-none"
 >

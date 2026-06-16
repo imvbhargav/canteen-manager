@@ -35,6 +35,7 @@
 	let totalBalance: string | number = $state(0);
 
 	let searchQuery: string = $state('');
+	let statusFilter: 'all' | 'active' | 'inactive' = $state('all');
 	let nextCursor: string | null = $state(null);
 	let hasNextPage: boolean = $state(false);
 
@@ -54,6 +55,11 @@
 		}
 	}
 
+	function handleStatusFilter(filter: 'all' | 'active' | 'inactive') {
+		statusFilter = filter;
+		fetchUsers(null, true);
+	}
+
 	// Fetch Users with optional cursor and search reset
 	async function fetchUsers(cursor: string | null = null, reset: boolean = false): Promise<void> {
 		if (reset) {
@@ -65,6 +71,11 @@
 		url.searchParams.set('limit', '15');
 		if (cursor) url.searchParams.set('cursor', cursor);
 		if (searchQuery.trim()) url.searchParams.set('search', searchQuery.trim());
+
+		// 2. Append the status parameter if it's not set to 'all'
+		if (statusFilter !== 'all') {
+			url.searchParams.set('status', statusFilter);
+		}
 
 		try {
 			const response: Response = await fetch(url.toString());
@@ -222,6 +233,47 @@
 					placeholder="Search name, roll number, or ID..."
 					class="w-full rounded-full border border-muted/40 bg-card py-3.5 pr-4 pl-11 text-[13px] font-bold text-foreground shadow-[0_2px_12px_rgb(0,0,0,0.02)] transition-colors outline-none placeholder:text-foreground/30 focus:border-foreground/50"
 				/>
+			</div>
+			<div
+				class="relative mx-2 flex items-center justify-between gap-1 rounded-2xl border border-accent/10 bg-accent/5 p-2"
+			>
+				<div
+					class="absolute top-1.5 bottom-1.5 left-1.5 z-0 rounded-xl border border-muted/30 bg-primary shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-300 ease-out"
+					class:translate-x-0={statusFilter === 'all'}
+					class:left-[calc(33.33%)]={statusFilter === 'active'}
+					class:left-[calc(66%)]={statusFilter === 'inactive'}
+					style="width: calc(33.33% - 4px);"
+				></div>
+
+				<button
+					onclick={() => handleStatusFilter('all')}
+					class="relative z-10 min-w-17.5 flex-1 rounded-xl px-3.5 py-1.5 text-center text-[11px] font-bold tracking-wider uppercase transition-colors duration-200
+            {statusFilter === 'all'
+						? 'text-background'
+						: 'text-foreground/60 hover:text-foreground/80'}"
+				>
+					All
+				</button>
+
+				<button
+					onclick={() => handleStatusFilter('active')}
+					class="relative z-10 flex min-w-17.5 flex-1 items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-center text-[11px] font-bold tracking-wider uppercase transition-colors duration-200
+            {statusFilter === 'active'
+						? 'text-background'
+						: 'text-foreground/60 hover:text-foreground/80'}"
+				>
+					Active
+				</button>
+
+				<button
+					onclick={() => handleStatusFilter('inactive')}
+					class="relative z-10 flex min-w-17.5 flex-1 items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-center text-[11px] font-bold tracking-wider uppercase transition-colors duration-200
+            {statusFilter === 'inactive'
+						? 'text-background'
+						: 'text-foreground/60 hover:text-foreground/80'}"
+				>
+					Inactive
+				</button>
 			</div>
 		</div>
 

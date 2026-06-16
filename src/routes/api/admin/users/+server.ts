@@ -5,7 +5,6 @@ import { and, lt, desc, or, ilike, not, eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals, url }) => {
-	// Basic auth check (You might want to explicitly check locals.user.role === 'ADMIN' here)
 	if (!locals.user) {
 		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
 	}
@@ -14,6 +13,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	const limit = limitParam > 0 && limitParam <= 50 ? limitParam : 15;
 	const cursor = url.searchParams.get('cursor');
 	const search = url.searchParams.get('search');
+	const status = url.searchParams.get('status');
 
 	try {
 		const conditions = [];
@@ -30,6 +30,13 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			);
 		}
 
+		// Apply Status Filter Conditions
+		if (status === 'active') {
+			conditions.push(eq(users.isActive, true));
+		} else if (status === 'inactive') {
+			conditions.push(eq(users.isActive, false));
+		}
+
 		// Apply Cursor Pagination
 		if (cursor) {
 			conditions.push(lt(users.createdAt, new Date(cursor)));
@@ -38,6 +45,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
 		const userRecords = await db.query.users.findMany({
+			// Ensure status filtering plays nice with excluding other admins
 			where: and(whereClause, not(eq(users.role, 'ADMIN'))),
 			orderBy: [desc(users.createdAt)],
 			limit: limit + 1,
