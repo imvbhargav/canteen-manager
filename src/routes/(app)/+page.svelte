@@ -80,6 +80,16 @@
 		isSettingsOpen = false;
 	}
 
+	function goToProfile() {
+		closeSettings();
+		goto(resolve('/profile'));
+	}
+
+	function goToOrders() {
+		closeSettings();
+		goto(resolve('/orders'));
+	}
+
 	async function executeLogout(): Promise<void> {
 		await fetch('/api/auth/logout', { method: 'POST' });
 		window.location.href = '/login';
@@ -198,20 +208,20 @@
 						role="none"
 						class="animate-in fade-in zoom-in-95 slide-in-from-top-2 absolute top-11 right-0 z-50 w-48 origin-top-right rounded-2xl border border-muted bg-card p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] duration-150"
 					>
-						<a
-							href={resolve('/profile')}
+						<button
+							onclick={goToProfile}
 							class="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-bold text-foreground/80 transition-colors hover:bg-muted/40 active:bg-muted/70"
 						>
 							<User size={15} strokeWidth={2.5} class="text-foreground/40" />
 							My Profile
-						</a>
-						<a
-							href={resolve('/orders')}
+						</button>
+						<button
+							onclick={goToOrders}
 							class="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-bold text-foreground/80 transition-colors hover:bg-muted/40 active:bg-muted/70"
 						>
 							<History size={15} strokeWidth={2.5} class="text-foreground/40" />
 							Order History
-						</a>
+						</button>
 						<button
 							onclick={handleLogout}
 							class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13px] font-bold text-destructive transition-colors hover:bg-destructive/5 active:bg-destructive/10"
