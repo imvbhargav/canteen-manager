@@ -78,6 +78,16 @@
 	}
 }
 
+html,
+body {
+	overscroll-behavior: none;
+	touch-action: manipulation;
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-tap-highlight-color: transparent;
+}
+
 /* Scrollbar hidden for mobile */
 ::-webkit-scrollbar {
 	display: none;
