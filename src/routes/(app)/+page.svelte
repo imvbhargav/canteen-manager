@@ -200,7 +200,6 @@
 					>
 						<a
 							href={resolve('/profile')}
-							onclick={closeSettings}
 							class="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-bold text-foreground/80 transition-colors hover:bg-muted/40 active:bg-muted/70"
 						>
 							<User size={15} strokeWidth={2.5} class="text-foreground/40" />
@@ -208,7 +207,6 @@
 						</a>
 						<a
 							href={resolve('/orders')}
-							onclick={closeSettings}
 							class="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-bold text-foreground/80 transition-colors hover:bg-muted/40 active:bg-muted/70"
 						>
 							<History size={15} strokeWidth={2.5} class="text-foreground/40" />
