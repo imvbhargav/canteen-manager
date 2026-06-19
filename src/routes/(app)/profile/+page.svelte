@@ -13,7 +13,10 @@
 		KeyRound,
 		Laptop,
 		CreditCard,
-		Utensils
+		Utensils,
+		PhoneCall,
+		Mail,
+		Camera
 	} from 'lucide-svelte';
 
 	interface BeforeInstallPromptEvent extends Event {
@@ -349,46 +352,87 @@
 
 			<!-- ── Footer ── -->
 			<div class="space-y-4 pt-2">
-				<div class="pb-16 font-site-name font-black">
+				<div class="pb-8 font-black">
 					<div class="space-y-4 rounded-xl p-4">
-						<div class="flex items-center justify-between">
+						<!-- Contact -->
+						<div class="space-y-2 text-sm">
+							<p class="font-site-name font-black tracking-wide text-foreground/70 uppercase">
+								Contact Us
+							</p>
+
+							<a
+								href="tel:+917760762484"
+								class="flex w-fit items-center gap-2 text-foreground/60 transition-colors hover:text-primary"
+							>
+								<PhoneCall class="size-3" />
+								<span> +91 77607 62484 </span>
+							</a>
+
+							<a
+								href="mailto:info@munchup.in"
+								class="flex w-fit items-center gap-2 text-foreground/60 transition-colors hover:text-primary"
+							>
+								<Mail class="size-3" />
+								<span> info@munchup.in </span>
+							</a>
+
+							<a
+								href="https://instagram.com/peppervine_hospitality"
+								target="_blank"
+								rel="noopener noreferrer"
+								class="flex w-fit items-center gap-2 text-foreground/60 transition-colors hover:text-primary"
+							>
+								<Camera class="size-3" />
+								<span> Instagram ↗ </span>
+							</a>
+						</div>
+						<div class="mt-10 flex items-center justify-between font-site-name">
 							<div class="flex w-full flex-col">
 								<p
-									class="flex w-full justify-between text-[10px] tracking-widest text-foreground/40"
+									class="flex w-full items-center justify-between text-[10px] tracking-widest text-foreground/40"
 								>
-									<span>
+									<span class="w-fit">
 										&copy; MunchUp - {new Date().getFullYear()}
 									</span>
-									<span class="uppercase"> Basavanagudi </span>
+
+									<span
+										class="h-0.5 flex-1 bg-linear-to-r from-transparent via-accent/15 to-transparent"
+									></span>
+									<span class="uppercase">Basavanagudi</span>
 								</p>
+
 								<p class="mt-4 ml-1 text-foreground/50">A unit of</p>
-								<div class="relative overflow-hidden">
-									<div
-										class="absolute inset-0 z-10 bg-linear-to-b from-background/25 to-background"
-									></div>
-									<div class="mx-auto w-full max-w-md">
-										<h1
-											class="block w-full text-center text-[clamp(2.8rem,15.5vw,4.25rem)] leading-none font-black tracking-tighter opacity-85 select-none"
-										>
-											Pepper<span class="text-primary">Vine</span>
-										</h1>
-									</div>
+
+								<div class="mx-auto w-full max-w-md">
+									<h1
+										class="block w-full text-center font-cinzel text-[clamp(2.8rem,15.5vw,4.2rem)] leading-none font-semibold tracking-tighter select-none"
+									>
+										Pepper<span class="text-[#4F6F52]">Vine</span>
+									</h1>
 								</div>
+
 								<p class="text-right text-foreground/50">Hospitality</p>
 							</div>
 						</div>
 					</div>
-					<p class="mt-4 px-5 text-[10px] text-foreground/60">
-						Built by
-						<a
-							href="https://xharv.in"
-							target="_blank"
-							rel="noopener noreferrer"
-							class="hover:underline"
-						>
-							@imvbhargav
-						</a>
-					</p>
+
+					<div class="flex items-center justify-between">
+						<span class="h-0.5 flex-1 bg-linear-to-r from-transparent via-accent/15 to-transparent"
+						></span>
+						<p class="px-5 text-[11px] text-foreground/50">
+							Built by
+							<a
+								href="https://xharv.in"
+								target="_blank"
+								rel="noopener noreferrer"
+								class="hover:underline"
+							>
+								@imvbhargav
+							</a>
+						</p>
+						<span class="h-0.5 flex-1 bg-linear-to-r from-transparent via-accent/15 to-transparent"
+						></span>
+					</div>
 				</div>
 			</div>
 		</div>
