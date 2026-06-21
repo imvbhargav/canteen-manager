@@ -147,7 +147,8 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 			.trigger([`counter-${counterId}`, 'admin-orders'], 'NEW_ORDER', {
 				orderId: result.id,
 				counterId: counterId,
-				ticketReference: result.ticketReference, // Returned automatically by Postgres via returning()
+				ticketReference: result.ticketReference,
+				createdAt: result.createdAt,
 				netTotal: serverTotal.toFixed(2),
 				items: receiptItems
 			})
