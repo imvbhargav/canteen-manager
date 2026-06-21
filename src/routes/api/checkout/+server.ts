@@ -144,7 +144,7 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 
 		// Asynchronous non-blocking broadcast dispatch
 		const pusherPromise = pusher
-			.trigger([`counter-${counterId}`, 'admin-orders'], 'NEW_ORDER', {
+			.trigger([`counter-${counterId}`], 'NEW_ORDER', {
 				orderId: result.id,
 				counterId: counterId,
 				ticketReference: result.ticketReference,
