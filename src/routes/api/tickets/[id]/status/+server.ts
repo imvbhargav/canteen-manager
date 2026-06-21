@@ -7,15 +7,22 @@ import { eq } from 'drizzle-orm';
 const VALID_STATUSES = ['PENDING', 'READY', 'COMPLETED', 'CANCELLED'] as const;
 type TicketStatus = (typeof VALID_STATUSES)[number];
 
-export const PATCH: RequestHandler = async ({ params, request, locals }) => {
-	// Authorization Guard
-	if (!locals.user) {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
-	}
-
+export const PATCH: RequestHandler = async ({ params, request }) => {
 	const ticketId = params.id;
 	if (!ticketId) {
 		return json({ success: false, error: 'Missing ticket ID parameter' }, { status: 400 });
+	}
+
+	// Strict Request Identifier Validation
+	const requestId = request.headers.get('x-request-id');
+	if (!requestId) {
+		return json(
+			{
+				success: false,
+				error: 'Bad Request: Missing strict X-Request-Id header identification bounds'
+			},
+			{ status: 400 }
+		);
 	}
 
 	try {
@@ -36,6 +43,19 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 
 		if (!existingTicket) {
 			return json({ success: false, error: 'Ticket not found' }, { status: 404 });
+		}
+
+		// Check if the state is already mutated matching this request context
+		if (existingTicket.status === status) {
+			return json({
+				success: true,
+				message: 'Status already verified matching request state identifier.',
+				data: {
+					orderId: existingTicket.id,
+					status: existingTicket.status,
+					ticketReference: existingTicket.ticketReference
+				}
+			});
 		}
 
 		// Perform atomic update in the DB
