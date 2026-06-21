@@ -35,7 +35,7 @@ interface ReceiptItem {
 	itemTotal: string;
 }
 
-export const POST: RequestHandler = async ({ request, locals, platform }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!locals.user) {
 		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
 	}
@@ -63,7 +63,6 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 
 		const itemIds: string[] = cart.map((item: CartItem) => item.id);
 
-		// Fetch state configurations concurrently
 		const [counter, dbItems] = await Promise.all([
 			db.query.counters.findFirst({ where: eq(counters.id, counterId) }),
 			db.query.menuItems.findMany({ where: inArray(menuItems.id, itemIds) })
@@ -109,9 +108,7 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 			};
 		});
 
-		// Slimmed down transaction processing
 		const result = await db.transaction(async (tx) => {
-			// ticketReference is completely omitted; generated natively by trigger v4 before insertion
 			const [newTicket] = await tx
 				.insert(tickets)
 				.values({
@@ -142,22 +139,14 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 			itemTotal: item.itemTotal
 		}));
 
-		// Asynchronous non-blocking broadcast dispatch
-		const pusherPromise = pusher
-			.trigger([`counter-${counterId}`], 'NEW_ORDER', {
-				orderId: result.id,
-				counterId: counterId,
-				ticketReference: result.ticketReference,
-				createdAt: result.createdAt,
-				netTotal: serverTotal.toFixed(2),
-				items: receiptItems
-			})
-			.catch((err) => console.error('Pusher event emission failed safely:', err));
-
-		// Yield background tasks execution if deployed to serverless environments
-		if (platform?.context?.waitUntil) {
-			platform.context.waitUntil(pusherPromise);
-		}
+		await pusher.trigger([`counter-${counterId}`], 'NEW_ORDER', {
+			orderId: result.id,
+			counterId: counterId,
+			ticketReference: result.ticketReference,
+			createdAt: result.createdAt,
+			netTotal: serverTotal.toFixed(2),
+			items: receiptItems
+		});
 
 		return json({
 			success: true,
@@ -169,7 +158,6 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 	} catch (error: unknown) {
 		const errorMessage: string = error instanceof Error ? error.message : 'Unknown error occurred';
 
-		// Intercepts structural check constraints and trigger abort exceptions
 		if (errorMessage.includes('users_balance_check')) {
 			return json({ success: false, error: 'Insufficient funds' }, { status: 402 });
 		}
