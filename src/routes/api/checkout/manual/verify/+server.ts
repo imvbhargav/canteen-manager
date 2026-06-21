@@ -1,24 +1,15 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import {
-	users,
-	manualOrderOtps,
-	tickets,
-	ticketItems,
-	walletTransactions,
-	menuItems,
-	counters
-} from '$lib/server/db/schema';
+import { manualOrderOtps, tickets, ticketItems, menuItems, counters } from '$lib/server/db/schema';
 import type { RequestHandler } from './$types';
-import { eq, and, gt } from 'drizzle-orm';
-import { generateTicketReference } from '$lib';
+import { eq, and, gt, inArray } from 'drizzle-orm';
 
 interface CartItem {
 	menuItemId: string;
 	quantity: number;
 }
 
-interface PreparedTicketItem {
+interface ValidatedItem {
 	menuItemId: string;
 	quantity: number;
 	unitPrice: string;
@@ -31,7 +22,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	const activeUserId = locals.user.id;
 
-	// Fixed: Removed counterId from the incoming payload extraction
 	const { otpCode, items } = (await request.json()) as {
 		otpCode: string;
 		items: CartItem[];
@@ -42,102 +32,74 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	try {
-		const validOtp = await db.query.manualOrderOtps.findFirst({
-			where: and(
-				eq(manualOrderOtps.otpCode, otpCode),
-				eq(manualOrderOtps.userId, activeUserId),
-				eq(manualOrderOtps.status, 'PENDING'),
-				gt(manualOrderOtps.expiresAt, new Date())
-			)
-		});
+		// Gather validation records and target items concurrently outside the transaction
+		const menuIds = items.map((i) => i.menuItemId);
+		const [validOtp, activeCounter, dbItems] = await Promise.all([
+			db.query.manualOrderOtps.findFirst({
+				where: and(
+					eq(manualOrderOtps.otpCode, otpCode),
+					eq(manualOrderOtps.userId, activeUserId),
+					eq(manualOrderOtps.status, 'PENDING'),
+					gt(manualOrderOtps.expiresAt, new Date())
+				)
+			}),
+			db.query.counters.findFirst({
+				where: eq(counters.status, 'ACTIVE') // Standardized check based on trigger configurations
+			}),
+			db.query.menuItems.findMany({
+				where: inArray(menuItems.id, menuIds)
+			})
+		]);
 
 		if (!validOtp) {
 			return json({ success: false, error: 'Invalid or expired OTP' }, { status: 400 });
 		}
+		if (!activeCounter) {
+			return json(
+				{ success: false, error: 'No operational checkout counters found to fulfill this order.' },
+				{ status: 400 }
+			);
+		}
 
+		let totalAmount = 0;
+		const validatedItems: ValidatedItem[] = items.map((item) => {
+			const dbItem = dbItems.find((dbI) => dbI.id === item.menuItemId);
+			if (!dbItem || !dbItem.inStock || dbItem.isArchived) {
+				throw new Error(`Item ${item.menuItemId} is unavailable.`);
+			}
+
+			const price = Number(dbItem.price);
+			totalAmount += price * item.quantity;
+
+			return {
+				menuItemId: dbItem.id,
+				quantity: item.quantity,
+				unitPrice: price.toFixed(2)
+			};
+		});
+
+		// Slimmed down transaction processing
 		const newTicket = await db.transaction(async (tx) => {
-			// 1. Fetch any single active fulfillment counter unit dynamically
-			// Note: Replace 'counters.isActive' with the exact boolean key your schema uses (e.g., status: 'ACTIVE')
-			const activeCounter = await tx.query.counters.findFirst({
-				where: eq(counters.isActive, true)
-			});
-
-			if (!activeCounter) {
-				throw new Error('No operational checkout counters found to fulfill this order.');
-			}
-
-			const userRecord = await tx.query.users.findFirst({
-				where: eq(users.id, activeUserId)
-			});
-			if (!userRecord) throw new Error('User record not found');
-
-			let totalAmount = 0;
-			const itemsToInsert: PreparedTicketItem[] = [];
-
-			for (const item of items) {
-				const menuResult = await tx.query.menuItems.findFirst({
-					where: eq(menuItems.id, item.menuItemId)
-				});
-
-				if (!menuResult || !menuResult.inStock || menuResult.isArchived) {
-					throw new Error(`Item ${item.menuItemId} is unavailable.`);
-				}
-
-				const itemPrice = Number(menuResult.price);
-				totalAmount += itemPrice * item.quantity;
-
-				itemsToInsert.push({
-					menuItemId: menuResult.id,
-					quantity: item.quantity,
-					unitPrice: menuResult.price
-				});
-			}
-
-			const currentBalance = parseFloat(userRecord.balance);
-			if (currentBalance < totalAmount) {
-				throw new Error('Insufficient wallet balance.');
-			}
-
-			const updatedBalance = (currentBalance - totalAmount).toFixed(2);
-			await tx
-				.update(users)
-				.set({ balance: updatedBalance, updatedAt: new Date() })
-				.where(eq(users.id, activeUserId));
-
-			const ticketReference: string = generateTicketReference();
-
-			// 2. Insert ticket utilizing the dynamically resolved counter ID string
+			// ticketReference is completely omitted; generated natively by trigger before insertion
 			const [ticket] = await tx
 				.insert(tickets)
 				.values({
-					ticketReference,
 					userId: activeUserId,
-					counterId: activeCounter.id, // Dynamically sourced from database
+					counterId: activeCounter.id,
 					totalAmount: totalAmount.toFixed(2),
 					status: 'PENDING',
 					printStatus: 'PENDING'
 				})
 				.returning();
 
-			const finalizedItems = itemsToInsert.map((i) => ({
-				ticketId: ticket.id,
-				menuItemId: i.menuItemId,
-				quantity: i.quantity,
-				unitPrice: i.unitPrice
-			}));
-
-			await tx.insert(ticketItems).values(finalizedItems);
-
-			await tx.insert(walletTransactions).values({
-				userId: activeUserId,
-				type: 'DEBIT',
-				amount: totalAmount.toFixed(2),
-				balanceAfter: updatedBalance,
-				referenceType: 'TICKET_PURCHASE',
-				ticketId: ticket.id,
-				description: `Manual order via counter fallback`,
-				idempotencyKey: `manual-txn-${ticket.id}`
-			});
+			await tx.insert(ticketItems).values(
+				validatedItems.map((i) => ({
+					ticketId: ticket.id,
+					menuItemId: i.menuItemId,
+					quantity: i.quantity,
+					unitPrice: i.unitPrice
+				}))
+			);
 
 			await tx
 				.update(manualOrderOtps)
@@ -152,13 +114,25 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			message: 'Order verified and processed successfully',
 			ticket: {
 				id: newTicket.id,
-				reference: newTicket.ticketReference,
+				reference: newTicket.ticketReference, // Returned automatically by Postgres via returning()
 				total: newTicket.totalAmount
 			}
 		});
 	} catch (error: unknown) {
 		console.error('Manual order processing failed:', error);
 		const errorMessage = error instanceof Error ? error.message : 'Failed to process order';
+
+		// Catch error hooks safely bubbling up from trigger exceptions
+		if (errorMessage.includes('users_balance_check')) {
+			return json({ success: false, error: 'Insufficient wallet balance.' }, { status: 402 });
+		}
+		if (errorMessage.includes('Item is currently out of stock')) {
+			return json(
+				{ success: false, error: 'An item in your cart went out of stock.' },
+				{ status: 409 }
+			);
+		}
+
 		return json({ success: false, error: errorMessage }, { status: 400 });
 	}
 };

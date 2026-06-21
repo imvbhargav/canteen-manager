@@ -13,7 +13,9 @@
 		Tag,
 		ShoppingBag,
 		Minus,
-		User
+		User,
+		Search,
+		X
 	} from 'lucide-svelte';
 	import { formatCurrencyINR } from '$lib';
 	import { SvelteDate, SvelteURLSearchParams } from 'svelte/reactivity';
@@ -85,7 +87,7 @@
 		totalAmount: string;
 		status: string;
 		createdAt: string;
-		user: { name: string; studentId: string; rollNumber: string };
+		user: { name: string; referenceKey: string; accountNumber: string };
 		items: OrderItem[];
 	}
 
@@ -133,6 +135,7 @@
 	let hasNextPage: boolean = $state(false);
 
 	let activePreset: Preset = $state<Preset>('30d');
+	let searchTicketRef: string = $state('');
 
 	let customStart: string = $state(getDateString(29));
 	let customEnd: string = $state(getDateString(0));
@@ -211,10 +214,13 @@
 		isLoading = true;
 		errorMessage = '';
 		try {
-			const params = new URLSearchParams({
-				startDate: `${effectiveStart}T00:00:00Z`,
-				endDate: `${effectiveEnd}T23:59:59Z`
-			});
+			const params = new SvelteURLSearchParams();
+			if (searchTicketRef.trim()) {
+				params.set('ticketReference', searchTicketRef.trim());
+			} else {
+				params.set('startDate', `${effectiveStart}T00:00:00Z`);
+				params.set('endDate', `${effectiveEnd}T23:59:59Z`);
+			}
 			const res = await fetch(`/api/admin/analytics?${params.toString()}`);
 			const json = await res.json();
 			if (res.ok && json.success) {
@@ -241,11 +247,13 @@
 		}
 
 		try {
-			const params = new SvelteURLSearchParams({
-				startDate: `${effectiveStart}T00:00:00Z`,
-				endDate: `${effectiveEnd}T23:59:59Z`,
-				limit: '15'
-			});
+			const params = new SvelteURLSearchParams({ limit: '15' });
+			if (searchTicketRef.trim()) {
+				params.set('ticketReference', searchTicketRef.trim());
+			} else {
+				params.set('startDate', `${effectiveStart}T00:00:00Z`);
+				params.set('endDate', `${effectiveEnd}T23:59:59Z`);
+			}
 			if (cursor) params.set('cursor', cursor);
 
 			const res = await fetch(`/api/admin/analytics/orders?${params.toString()}`);
@@ -278,6 +286,20 @@
 	}
 
 	function applyCustomRange(): void {
+		executeTabSyncLoad();
+	}
+
+	function handleSearchKeyDown(e: KeyboardEvent): void {
+		if (e.key === 'Enter') {
+			if (searchTicketRef.trim() && activeTab !== 'ORDERS_LIST') {
+				activeTab = 'ORDERS_LIST';
+			}
+			executeTabSyncLoad();
+		}
+	}
+
+	function clearSearch(): void {
+		searchTicketRef = '';
 		executeTabSyncLoad();
 	}
 
@@ -420,7 +442,31 @@
 			</div>
 		</div>
 
-		<div class="flex scrollbar-none items-center gap-1.5 overflow-x-auto p-4">
+		<div class="flex items-center gap-2 px-4 pt-2 pb-1">
+			<div
+				class="flex flex-1 items-center gap-2 rounded-xl border border-muted/10 bg-muted/20 px-3 py-1.5 focus-within:border-primary/30"
+			>
+				<Search size={14} class="shrink-0 text-foreground/40" />
+				<input
+					type="text"
+					placeholder="Search ticket reference..."
+					bind:value={searchTicketRef}
+					onkeydown={handleSearchKeyDown}
+					class="min-w-0 flex-1 bg-transparent text-[12px] font-medium text-foreground outline-none placeholder:text-foreground/30"
+				/>
+				{#if searchTicketRef}
+					<button onclick={clearSearch} class="text-foreground/40 hover:text-foreground">
+						<X size={14} />
+					</button>
+				{/if}
+			</div>
+		</div>
+
+		<div
+			class="flex scrollbar-none items-center gap-1.5 overflow-x-auto p-4 opacity={searchTicketRef
+				? 0.4
+				: 1} class:pointer-events-none={searchTicketRef}"
+		>
 			{#each PRESETS as p (p.key)}
 				<button
 					onclick={() => selectPreset(p.key)}
@@ -454,8 +500,8 @@
 			</button>
 		</div>
 
-		{#if activePreset === 'custom'}
-			<div class="flex items-center gap-2 px-4 pb-3">
+		{#if activePreset === 'custom' && !searchTicketRef}
+			<div class="flex items-center gap-2 px-4 pt-2 pb-3">
 				<div class="flex min-w-70 flex-1 items-center gap-1.5 rounded-xl bg-muted/20 px-3 py-2">
 					<input
 						type="date"
@@ -495,6 +541,16 @@
 					<Loader2 size={30} strokeWidth={2.5} class="animate-spin text-primary" />
 				</div>
 			{:else if data}
+				{#if searchTicketRef}
+					<div
+						class="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] font-medium text-amber-700"
+					>
+						Showing scope analytics filtered exclusively for ticket <strong
+							>{searchTicketRef}</strong
+						>. Clear search to resume timeline metrics.
+					</div>
+				{/if}
+
 				<div
 					class="flex items-center justify-between rounded-2xl border border-muted/30 bg-card p-5 shadow-sm"
 				>
@@ -506,12 +562,12 @@
 							{formatCurrencyINR(Number(data.summary.totalRevenue))}
 						</p>
 						<div class="mt-2 flex items-center gap-1.5">
-							{#if growthPositive(data.summary.revenueGrowth)}
+							{#if !searchTicketRef && growthPositive(data.summary.revenueGrowth)}
 								<TrendingUp size={12} strokeWidth={3} class="text-emerald-500" />
 								<span class="text-[11px] font-bold text-emerald-500"
 									>{formatGrowth(data.summary.revenueGrowth)} vs prior</span
 								>
-							{:else if growthNegative(data.summary.revenueGrowth)}
+							{:else if !searchTicketRef && growthNegative(data.summary.revenueGrowth)}
 								<TrendingDown size={12} strokeWidth={3} class="text-red-400" />
 								<span class="text-[11px] font-bold text-red-400"
 									>{formatGrowth(data.summary.revenueGrowth)} vs prior</span
@@ -540,12 +596,12 @@
 							{data.summary.totalOrders.toLocaleString()}
 						</p>
 						<div class="mt-2 flex items-center gap-1.5">
-							{#if growthPositive(data.summary.ordersGrowth)}
+							{#if !searchTicketRef && growthPositive(data.summary.ordersGrowth)}
 								<TrendingUp size={12} strokeWidth={3} class="text-emerald-500" />
 								<span class="text-[11px] font-bold text-emerald-500"
 									>{formatGrowth(data.summary.ordersGrowth)} vs prior</span
 								>
-							{:else if growthNegative(data.summary.ordersGrowth)}
+							{:else if !searchTicketRef && growthNegative(data.summary.ordersGrowth)}
 								<TrendingDown size={12} strokeWidth={3} class="text-red-400" />
 								<span class="text-[11px] font-bold text-red-400"
 									>{formatGrowth(data.summary.ordersGrowth)} vs prior</span
@@ -916,6 +972,19 @@
 			{/if}
 		{:else if activeTab === 'ORDERS_LIST'}
 			<div class="space-y-3">
+				{#if searchTicketRef}
+					<div
+						class="flex items-center justify-between rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] font-medium text-amber-700"
+					>
+						<span>Showing search results for ticket: <strong>{searchTicketRef}</strong></span>
+						<button
+							onclick={clearSearch}
+							class="text-[11px] font-bold tracking-wide text-amber-900 uppercase underline"
+							>Clear</button
+						>
+					</div>
+				{/if}
+
 				{#if feedOrders.length === 0 && !isFetchingOrdersFeed}
 					<div class="rounded-2xl border border-muted/25 bg-card py-12 text-center">
 						<p class="text-[13px] font-medium text-foreground/30">
@@ -948,7 +1017,8 @@
 										>
 											<User size={12} class="text-foreground/30" />
 											<span class="truncate">{order.user.name}</span>
-											<span class="font-normal text-foreground/30">({order.user.studentId})</span>
+											<span class="font-normal text-foreground/70">({order.user.referenceKey})</span
+											>
 										</div>
 									</div>
 									<div class="shrink-0 text-right">

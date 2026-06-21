@@ -1,9 +1,324 @@
 {
-  "id": "ac71e261-4dbd-4beb-8bc8-1c50f464edc9",
+  "id": "a80f6cf5-22d3-4fd3-ba7a-9433c26ecf06",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.counter_status_logs": {
+      "name": "counter_status_logs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "counter_id": {
+          "name": "counter_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "previous_status": {
+          "name": "previous_status",
+          "type": "counter_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "new_status": {
+          "name": "new_status",
+          "type": "counter_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "changed_at": {
+          "name": "changed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "counter_status_logs_counter_id_counters_id_fk": {
+          "name": "counter_status_logs_counter_id_counters_id_fk",
+          "tableFrom": "counter_status_logs",
+          "tableTo": "counters",
+          "columnsFrom": [
+            "counter_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.counters": {
+      "name": "counters",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "counter_number": {
+          "name": "counter_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "counter_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ACTIVE'"
+        },
+        "printer_type": {
+          "name": "printer_type",
+          "type": "printer_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'NONE'"
+        },
+        "printer_address": {
+          "name": "printer_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_identifier": {
+          "name": "device_identifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "counters_counter_number_unique": {
+          "name": "counters_counter_number_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "counter_number"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.daily_ticket_sequences": {
+      "name": "daily_ticket_sequences",
+      "schema": "",
+      "columns": {
+        "current_date_prefix": {
+          "name": "current_date_prefix",
+          "type": "varchar(6)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "last_sequence_number": {
+          "name": "last_sequence_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.login_attempts": {
+      "name": "login_attempts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "identifier": {
+          "name": "identifier",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attempted_at": {
+          "name": "attempted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.manual_order_otps": {
+      "name": "manual_order_otps",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "otp_code": {
+          "name": "otp_code",
+          "type": "varchar(6)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "otp_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "manual_order_otps_user_id_users_id_fk": {
+          "name": "manual_order_otps_user_id_users_id_fk",
+          "tableFrom": "manual_order_otps",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "manual_order_otps_otp_code_unique": {
+          "name": "manual_order_otps_otp_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "otp_code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "manual_otp_attempts_check": {
+          "name": "manual_otp_attempts_check",
+          "value": "\"manual_order_otps\".\"attempts\" <= 3"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.menu_items": {
       "name": "menu_items",
       "schema": "",
@@ -277,10 +592,16 @@
           "name": "ticket_reference",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "user_id": {
           "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "counter_id": {
+          "name": "counter_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -298,6 +619,26 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'PENDING'"
+        },
+        "print_status": {
+          "name": "print_status",
+          "type": "ticket_print_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING'"
+        },
+        "print_error_reason": {
+          "name": "print_error_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "printed_at": {
+          "name": "printed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -322,6 +663,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "tickets_counter_id_counters_id_fk": {
+          "name": "tickets_counter_id_counters_id_fk",
+          "tableFrom": "tickets",
+          "tableTo": "counters",
+          "columnsFrom": [
+            "counter_id"
           ],
           "columnsTo": [
             "id"
@@ -398,6 +752,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {},
@@ -441,23 +801,31 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "student_id": {
-          "name": "student_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "name": {
           "name": "name",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "roll_number": {
-          "name": "roll_number",
+        "account_number": {
+          "name": "account_number",
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "reference_key": {
+          "name": "reference_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "user_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'STUDENT'"
         },
         "balance": {
           "name": "balance",
@@ -472,40 +840,38 @@
           "primaryKey": false,
           "notNull": false
         },
-        "biometrics_enabled": {
-          "name": "biometrics_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "notify_orders": {
-          "name": "notify_orders",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "notify_wallet": {
-          "name": "notify_wallet",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "notify_promo": {
-          "name": "notify_promo",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "is_active": {
           "name": "is_active",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "deactivation_reason": {
+          "name": "deactivation_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "credential_photo_url": {
+          "name": "credential_photo_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batch_year": {
+          "name": "batch_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 2026
+        },
+        "expected_graduation_year": {
+          "name": "expected_graduation_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 2026
         },
         "created_at": {
           "name": "created_at",
@@ -526,18 +892,18 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "users_student_id_unique": {
-          "name": "users_student_id_unique",
+        "users_account_number_unique": {
+          "name": "users_account_number_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "student_id"
+            "account_number"
           ]
         },
-        "users_roll_number_unique": {
-          "name": "users_roll_number_unique",
+        "users_reference_key_unique": {
+          "name": "users_reference_key_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "roll_number"
+            "reference_key"
           ]
         }
       },
@@ -698,12 +1064,30 @@
         "Beverages"
       ]
     },
+    "public.counter_status": {
+      "name": "counter_status",
+      "schema": "public",
+      "values": [
+        "ACTIVE",
+        "PRINTER_ISSUE",
+        "OFFLINE"
+      ]
+    },
     "public.dietary_type": {
       "name": "dietary_type",
       "schema": "public",
       "values": [
         "veg",
         "non-veg"
+      ]
+    },
+    "public.otp_status": {
+      "name": "otp_status",
+      "schema": "public",
+      "values": [
+        "PENDING",
+        "VERIFIED",
+        "EXPIRED"
       ]
     },
     "public.payment_provider": {
@@ -725,6 +1109,25 @@
         "SUCCESS",
         "FAILED",
         "REFUNDED"
+      ]
+    },
+    "public.printer_type": {
+      "name": "printer_type",
+      "schema": "public",
+      "values": [
+        "LAN",
+        "BT",
+        "USB",
+        "NONE"
+      ]
+    },
+    "public.ticket_print_status": {
+      "name": "ticket_print_status",
+      "schema": "public",
+      "values": [
+        "PENDING",
+        "PRINTED",
+        "FAILED"
       ]
     },
     "public.ticket_status": {
@@ -753,6 +1156,15 @@
       "values": [
         "CREDIT",
         "DEBIT"
+      ]
+    },
+    "public.user_role": {
+      "name": "user_role",
+      "schema": "public",
+      "values": [
+        "STUDENT",
+        "STAFF",
+        "ADMIN"
       ]
     }
   },

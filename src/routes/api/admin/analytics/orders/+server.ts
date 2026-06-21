@@ -17,27 +17,42 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	}
 
 	try {
-		// Date parsing parameters
+		// Search and parsing parameters
+		const ticketReference = url.searchParams.get('ticketReference');
 		const startDateParam = url.searchParams.get('startDate');
 		const endDateParam = url.searchParams.get('endDate');
-		const cursor = url.searchParams.get('cursor'); // Expected to be an ISO timestamp
+		const cursor = url.searchParams.get('cursor');
 
 		const limitParam = parseInt(url.searchParams.get('limit') || '15', 10);
 		const limit = limitParam > 0 && limitParam <= 50 ? limitParam : 15;
 
-		if (!startDateParam || !endDateParam) {
-			return json({ success: false, error: 'Missing date boundary values' }, { status: 400 });
-		}
+		// Dynamic condition setup
+		let conditions;
 
-		// Base filter setup
-		let conditions = and(
-			gte(tickets.createdAt, new Date(startDateParam)),
-			lte(tickets.createdAt, new Date(endDateParam))
-		);
+		if (ticketReference) {
+			// If searching by a specific ticket reference, narrow down directly to it
+			conditions = eq(tickets.ticketReference, ticketReference.toUpperCase());
+		} else {
+			// Otherwise, enforce and use the date range validation
+			if (!startDateParam || !endDateParam) {
+				return json(
+					{
+						success: false,
+						error: 'Missing date boundary values or a ticket reference'
+					},
+					{ status: 400 }
+				);
+			}
 
-		// Append cursor condition if paginating
-		if (cursor) {
-			conditions = and(conditions, lt(tickets.createdAt, new Date(cursor)));
+			conditions = and(
+				gte(tickets.createdAt, new Date(startDateParam)),
+				lte(tickets.createdAt, new Date(endDateParam))
+			);
+
+			// Append cursor condition if paginating
+			if (cursor) {
+				conditions = and(conditions, lt(tickets.createdAt, new Date(cursor)));
+			}
 		}
 
 		const orderRecords = await db.query.tickets.findMany({
@@ -46,7 +61,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			limit: limit + 1, // Fetch an extra record to determine next page
 			with: {
 				user: {
-					columns: { name: true, studentId: true, rollNumber: true }
+					columns: { name: true, referenceKey: true, accountNumber: true }
 				},
 				items: {
 					with: {

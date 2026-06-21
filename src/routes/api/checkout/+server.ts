@@ -1,20 +1,11 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import {
-	users,
-	tickets,
-	ticketItems,
-	walletTransactions,
-	menuItems,
-	counters
-} from '$lib/server/db/schema';
-import { eq, inArray, sql } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
+import { tickets, ticketItems, menuItems, counters } from '$lib/server/db/schema';
+import { eq, inArray } from 'drizzle-orm';
 import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 import { decryptCounterData } from '$lib/crypto';
 import Pusher from 'pusher';
-import { generateTicketReference } from '$lib';
 
 const pusher: Pusher = new Pusher({
 	appId: env.PUSHER_APP_ID as string,
@@ -44,7 +35,7 @@ interface ReceiptItem {
 	itemTotal: string;
 }
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, platform }) => {
 	if (!locals.user) {
 		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
 	}
@@ -65,22 +56,23 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	try {
-		// Decrypt payload to extract counter ID
 		const counterId: string | null = decryptCounterData(securePayload);
 		if (!counterId) {
 			return json({ success: false, error: 'Invalid or tampered QR code' }, { status: 400 });
 		}
 
-		// Fetch counter state from DB
-		const counter = await db.query.counters.findFirst({
-			where: eq(counters.id, counterId)
-		});
+		const itemIds: string[] = cart.map((item: CartItem) => item.id);
+
+		// Fetch state configurations concurrently
+		const [counter, dbItems] = await Promise.all([
+			db.query.counters.findFirst({ where: eq(counters.id, counterId) }),
+			db.query.menuItems.findMany({ where: inArray(menuItems.id, itemIds) })
+		]);
 
 		if (!counter) {
 			return json({ success: false, error: 'Counter not found' }, { status: 404 });
 		}
 
-		// Handle structural or functional master switch status
 		if (!counter.isActive) {
 			return json(
 				{ success: false, error: `Counter ${counter.displayName} is deactivated.` },
@@ -88,7 +80,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
-		// Handle nuanced counter statuses explicitly based on enum definitions
 		if (counter.status !== 'ACTIVE') {
 			let reason = 'This counter is currently unavailable';
 			if (counter.status === 'OFFLINE') {
@@ -96,17 +87,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			} else if (counter.status === 'PRINTER_ISSUE') {
 				reason = `Counter ${counter.displayName} is facing hardware/printer problems.`;
 			}
-
 			return json({ success: false, error: reason }, { status: 400 });
 		}
 
-		const itemIds: string[] = cart.map((item: CartItem) => item.id);
-		const dbItems = await db.query.menuItems.findMany({
-			where: inArray(menuItems.id, itemIds)
-		});
-
 		let serverTotal: number = 0;
-
 		const validatedItems: ValidatedItem[] = cart.map((cartItem: CartItem) => {
 			const dbItem = dbItems.find((i) => i.id === cartItem.id);
 			if (!dbItem || !dbItem.inStock) {
@@ -125,21 +109,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			};
 		});
 
+		// Slimmed down transaction processing
 		const result = await db.transaction(async (tx) => {
-			const [updatedUser] = await tx
-				.update(users)
-				.set({ balance: sql`${users.balance} - ${serverTotal}` })
-				.where(eq(users.id, userId))
-				.returning({ newBalance: users.balance });
-
-			const ticketRef: string = generateTicketReference();
-
+			// ticketReference is completely omitted; generated natively by trigger v4 before insertion
 			const [newTicket] = await tx
 				.insert(tickets)
 				.values({
 					userId,
 					counterId: counterId,
-					ticketReference: ticketRef,
 					totalAmount: serverTotal.toFixed(2),
 					status: 'PENDING',
 					printStatus: 'PENDING'
@@ -155,17 +132,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				}))
 			);
 
-			await tx.insert(walletTransactions).values({
-				userId,
-				type: 'DEBIT',
-				amount: serverTotal.toFixed(2),
-				balanceAfter: updatedUser.newBalance,
-				referenceType: 'TICKET_PURCHASE',
-				ticketId: newTicket.id,
-				description: 'Canteen Checkout',
-				idempotencyKey: randomUUID()
-			});
-
 			return newTicket;
 		});
 
@@ -176,13 +142,21 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			itemTotal: item.itemTotal
 		}));
 
-		await pusher.trigger([`counter-${counterId}`, 'admin-orders'], 'NEW_ORDER', {
-			orderId: result.id,
-			counterId: counterId,
-			ticketReference: result.ticketReference,
-			netTotal: serverTotal.toFixed(2),
-			items: receiptItems
-		});
+		// Asynchronous non-blocking broadcast dispatch
+		const pusherPromise = pusher
+			.trigger([`counter-${counterId}`, 'admin-orders'], 'NEW_ORDER', {
+				orderId: result.id,
+				counterId: counterId,
+				ticketReference: result.ticketReference, // Returned automatically by Postgres via returning()
+				netTotal: serverTotal.toFixed(2),
+				items: receiptItems
+			})
+			.catch((err) => console.error('Pusher event emission failed safely:', err));
+
+		// Yield background tasks execution if deployed to serverless environments
+		if (platform?.context?.waitUntil) {
+			platform.context.waitUntil(pusherPromise);
+		}
 
 		return json({
 			success: true,
@@ -194,8 +168,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	} catch (error: unknown) {
 		const errorMessage: string = error instanceof Error ? error.message : 'Unknown error occurred';
 
+		// Intercepts structural check constraints and trigger abort exceptions
 		if (errorMessage.includes('users_balance_check')) {
 			return json({ success: false, error: 'Insufficient funds' }, { status: 402 });
+		}
+		if (errorMessage.includes('Item is currently out of stock')) {
+			return json(
+				{ success: false, error: 'An item in your cart went out of stock' },
+				{ status: 409 }
+			);
 		}
 
 		return json({ success: false, error: errorMessage || 'Checkout failed' }, { status: 500 });

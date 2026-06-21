@@ -8,6 +8,12 @@ declare global {
 			} | null;
 			sessionId: string | null;
 		}
+		interface Platform {
+			env?: Record<string, unknown>;
+			context: {
+				waitUntil(promise: Promise<unknown>): void;
+			};
+		}
 	}
 }
 export {};

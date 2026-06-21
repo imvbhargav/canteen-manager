@@ -146,11 +146,16 @@ export const counterStatusLogs = pgTable('counter_status_logs', {
 	changedAt: timestamp('changed_at', { withTimezone: true }).defaultNow().notNull()
 });
 
+export const dailyTicketSequences = pgTable('daily_ticket_sequences', {
+	currentDatePrefix: varchar('current_date_prefix', { length: 6 }).primaryKey(),
+	lastSequenceNumber: integer('last_sequence_number').default(0).notNull()
+});
+
 export const tickets = pgTable(
 	'tickets',
 	{
 		id: uuid('id').defaultRandom().primaryKey(),
-		ticketReference: text('ticket_reference').notNull().unique(),
+		ticketReference: text('ticket_reference').unique(),
 		userId: uuid('user_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'restrict' }),
