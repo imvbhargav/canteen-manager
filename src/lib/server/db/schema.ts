@@ -8,7 +8,8 @@ import {
 	uuid,
 	pgEnum,
 	check,
-	varchar
+	varchar,
+	index
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
@@ -165,12 +166,15 @@ export const tickets = pgTable(
 		totalAmount: numeric('total_amount', { precision: 10, scale: 2 }).notNull(),
 		status: ticketStatusEnum('status').default('PENDING').notNull(),
 		printStatus: ticketPrintStatusEnum('print_status').default('PENDING').notNull(),
-		printErrorReason: text('print_error_reason'), // e.g., "PAPER_OUT", "USB_DISCONNECTED"
+		printErrorReason: text('print_error_reason'),
 		printedAt: timestamp('printed_at', { withTimezone: true }),
 		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 	},
-	(table) => [check('tickets_total_check', sql`${table.totalAmount} >= 0`)]
+	(table) => [
+		check('tickets_total_check', sql`${table.totalAmount} >= 0`),
+		index('idx_tickets_pending_timeout').on(table.status, table.printStatus, table.createdAt)
+	]
 );
 
 export const ticketItems = pgTable(

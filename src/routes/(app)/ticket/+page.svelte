@@ -12,7 +12,9 @@
 		Loader2,
 		Home,
 		AlertCircle,
-		RefreshCw
+		RefreshCw,
+		Clock,
+		ShieldCheck
 	} from 'lucide-svelte';
 	import jsQR from 'jsqr';
 	import type { QRCode } from 'jsqr';
@@ -283,17 +285,19 @@
 		{#if scanState === 'success' && completedTicket}
 			<div class="space-y-4">
 				<div
-					class="flex flex-col items-center gap-3 rounded-3xl border border-emerald-500/15 bg-emerald-500/5 p-6 text-center shadow-sm"
+					class="flex flex-col items-center gap-3 rounded-3xl border border-amber-500/20 bg-amber-500/5 p-6 text-center shadow-sm"
 				>
-					<div class="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15">
-						<CheckCircle size={26} class="text-emerald-500" strokeWidth={2.5} />
+					<div class="flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/15">
+						<Clock size={26} class="animate-pulse text-amber-500" strokeWidth={2.5} />
 					</div>
 					<div>
-						<h3 class="text-[18px] font-bold text-foreground">Order Confirmed</h3>
-						<p
-							class="mt-1 font-mono text-[11px] font-bold tracking-wider text-emerald-600 uppercase"
-						>
-							{formatCurrencyINR(completedTotal)} debited from wallet
+						<h3 class="text-[18px] font-bold text-foreground">Order Received</h3>
+						<p class="mt-1 max-w-72 text-[12px] leading-relaxed font-medium text-foreground/60">
+							Your allocation request has been routed to the kitchen. The transaction finalizes when
+							the token slip finishes physical printing.
+						</p>
+						<p class="mt-3 font-mono text-[11px] font-bold tracking-wider text-amber-600 uppercase">
+							{formatCurrencyINR(completedTotal)} Held From Wallet
 						</p>
 					</div>
 				</div>
@@ -338,10 +342,26 @@
 					<div
 						class="flex items-center justify-between border-t border-muted/20 bg-muted/25 px-5 py-3.5"
 					>
-						<span class="text-[12px] font-bold text-foreground/60">Total Amount Paid</span>
+						<span class="text-[12px] font-bold text-foreground/60">Total Amount Staged</span>
 						<span class="font-mono text-[17px] font-bold text-foreground"
 							>{formatCurrencyINR(completedTotal)}</span
 						>
+					</div>
+				</div>
+
+				<div
+					class="flex items-start gap-3 rounded-2xl border border-emerald-500/10 bg-emerald-500/5 p-4 text-emerald-800"
+				>
+					<ShieldCheck size={18} class="mt-0.5 shrink-0 text-emerald-600" strokeWidth={2.5} />
+					<div class="flex flex-col gap-0.5">
+						<span class="text-[11px] font-bold tracking-wider text-emerald-600 uppercase"
+							>Failsafe Protection Active</span
+						>
+						<p class="text-[11px] leading-relaxed font-medium text-emerald-700/90">
+							If your network drops, a hardware jam occurs, or the order remains unprinted for more
+							than 1 hour, our automated system engine will expire the ticket and safely return the
+							full amount back to your wallet ledger.
+						</p>
 					</div>
 				</div>
 
