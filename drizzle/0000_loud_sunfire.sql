@@ -185,7 +185,7 @@ SELECT cron.schedule(
 
 -- Schedule the stale ticket cleanup job
 -- This runs every 5 minutes ('*/5 * * * *')
--- It marks tickets pending for > 1 hour as CANCELLED and print FAILED
+-- It marks tickets pending for > 10 minutes as CANCELLED and print FAILED
 SELECT cron.schedule(
     'cleanup_stale_pending_tickets', 
     '*/5 * * * *', 
@@ -199,7 +199,7 @@ SELECT cron.schedule(
     WHERE 
         status = 'PENDING'
         AND print_status = 'PENDING'
-        AND created_at < NOW() - INTERVAL '1 hour';
+        AND created_at < NOW() - INTERVAL '10 minutes';
     $$
 );
 
@@ -273,6 +273,61 @@ END;
 $body$ LANGUAGE plpgsql;
 --> statement-breakpoint
 
+CREATE OR REPLACE FUNCTION handle_ticket_refund()
+RETURNS TRIGGER AS $body$
+DECLARE
+    final_balance NUMERIC;
+BEGIN
+    -- Condition A: Ticket status explicitly moved to CANCELLED
+    -- Condition B: Print status specifically moved to FAILED (Pusher missed, paper jam, etc.)
+    -- Guard: Only fires if it is transitioning into these states to prevent double refunds
+    IF (
+        (NEW.status = 'CANCELLED' AND OLD.status IS DISTINCT FROM 'CANCELLED') 
+        OR 
+        (NEW.print_status = 'FAILED' AND OLD.print_status IS DISTINCT FROM 'FAILED')
+       ) THEN
+        
+        -- Credit the money back to the user's wallet
+        UPDATE users 
+        SET balance = balance + NEW.total_amount
+        WHERE id = NEW.user_id
+        RETURNING balance INTO final_balance;
+
+        -- Log the CREDIT transaction using your schema's exact enum 'REFUND'
+        INSERT INTO wallet_transactions (
+            id, 
+            user_id, 
+            type, 
+            amount, 
+            balance_after, 
+            reference_type, 
+            ticket_id, 
+            description, 
+            idempotency_key, 
+            created_at
+        ) 
+        VALUES (
+            gen_random_uuid(), 
+            NEW.user_id, 
+            'CREDIT',                  
+            NEW.total_amount, 
+            final_balance, 
+            'REFUND',                  
+            NEW.id, 
+            CASE 
+                WHEN NEW.status = 'CANCELLED' THEN 'Ticket Cancelled Refund'
+                ELSE 'Print Failure Refund (' || COALESCE(NEW.print_error_reason, 'UNKNOWN') || ')'
+            END, 
+            gen_random_uuid(), 
+            NOW()
+        );
+    END IF;
+
+    RETURN NEW;
+END;
+$body$ LANGUAGE plpgsql;
+--> statement-breakpoint
+
 DROP TRIGGER IF EXISTS tr_generate_ticket_ref ON tickets;
 --> statement-breakpoint
 CREATE TRIGGER tr_generate_ticket_ref
@@ -295,3 +350,13 @@ CREATE TRIGGER tr_on_ticket_inserted
     AFTER INSERT ON tickets
     FOR EACH ROW
     EXECUTE FUNCTION handle_ticket_checkout();
+--> statement-breakpoint
+
+DROP TRIGGER IF EXISTS tr_on_ticket_refund ON tickets;
+--> statement-breakpoint
+CREATE TRIGGER tr_on_ticket_refund
+    AFTER UPDATE ON tickets
+    FOR EACH ROW
+    WHEN (NEW.status = 'CANCELLED' OR NEW.print_status = 'FAILED')
+    EXECUTE FUNCTION handle_ticket_refund();
+--> statement-breakpoint

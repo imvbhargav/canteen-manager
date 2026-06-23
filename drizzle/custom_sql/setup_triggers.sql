@@ -110,8 +110,8 @@ BEGIN
             'REFUND',                  
             NEW.id, 
             CASE 
-                WHEN NEW.status = 'CANCELLED' THEN 'Canteen Ticket Cancelled Refund'
-                ELSE 'Canteen Ticket Print Failure Refund (' || COALESCE(NEW.print_error_reason, 'UNKNOWN') || ')'
+                WHEN NEW.status = 'CANCELLED' THEN 'Ticket Cancelled Refund'
+                ELSE 'Print Failure Refund (' || COALESCE(NEW.print_error_reason, 'UNKNOWN') || ')'
             END, 
             gen_random_uuid(), 
             NOW()

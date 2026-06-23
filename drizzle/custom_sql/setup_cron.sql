@@ -12,7 +12,7 @@ SELECT cron.schedule(
 
 -- Schedule the stale ticket cleanup job
 -- This runs every 5 minutes ('*/5 * * * *')
--- It marks tickets pending for > 1 hour as CANCELLED and print FAILED
+-- It marks tickets pending for > 10 minutes as CANCELLED and print FAILED
 SELECT cron.schedule(
     'cleanup_stale_pending_tickets', 
     '*/5 * * * *', 
@@ -26,6 +26,6 @@ SELECT cron.schedule(
     WHERE 
         status = 'PENDING'
         AND print_status = 'PENDING'
-        AND created_at < NOW() - INTERVAL '1 hour';
+        AND created_at < NOW() - INTERVAL '10 minutes';
     $$
 );
