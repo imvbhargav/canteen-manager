@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { tickets, ticketItems, menuItems, counters } from '$lib/server/db/schema';
+import { tickets, ticketItems, menuItems, counters, engines } from '$lib/server/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
@@ -63,8 +63,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		const itemIds: string[] = cart.map((item: CartItem) => item.id);
 
-		const [counter, dbItems] = await Promise.all([
+		const [counter, activeEngine, dbItems] = await Promise.all([
 			db.query.counters.findFirst({ where: eq(counters.id, counterId) }),
+			db.query.engines.findFirst({
+				where: eq(engines.isOn, true)
+			}),
 			db.query.menuItems.findMany({ where: inArray(menuItems.id, itemIds) })
 		]);
 
@@ -87,6 +90,22 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				reason = `Counter ${counter.displayName} is facing hardware/printer problems.`;
 			}
 			return json({ success: false, error: reason }, { status: 400 });
+		}
+
+		const FIVE_MINUTES_IN_MS = 5 * 60 * 1000;
+		const lastPingTime = activeEngine?.lastPingedAt
+			? new Date(activeEngine.lastPingedAt).getTime()
+			: 0;
+		const isEngineDead = Date.now() - lastPingTime > FIVE_MINUTES_IN_MS;
+
+		if (!activeEngine || isEngineDead) {
+			return json(
+				{
+					success: false,
+					error: 'Order rejected: No active order processing engine is online right now.'
+				},
+				{ status: 400 }
+			);
 		}
 
 		let serverTotal: number = 0;

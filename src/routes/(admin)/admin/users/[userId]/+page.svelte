@@ -277,9 +277,10 @@
 				body: JSON.stringify({ userId: userId })
 			});
 			const data: QrGenerateResponse = await res.json();
-			if (data.success) {
+			if (res.ok && data.success) {
 				generatedOtp = data.otpCode;
 			} else {
+				// Captures "No active order processing engine is online right now" or other error states elegantly
 				otpError = data.error || 'Failed to generate token';
 			}
 		} catch (err: unknown) {
@@ -392,7 +393,7 @@
 			</div>
 		{:else if targetUser}
 			<div
-				class="relative overflow-hidden rounded-3xl border border-muted/30 bg-card p-5 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
+				class="relative overflow-hidden rounded-3xl border border-muted/30 bg-card p-5 shadow-[0_2px_12px_rgb(0,0_0,0.04)]"
 			>
 				<div class="flex items-start justify-between gap-4">
 					<div class="min-w-0">
@@ -427,7 +428,7 @@
 				<div
 					class="mt-5 flex items-center justify-between rounded-xl border border-muted/20 bg-muted/10"
 				>
-					<div>
+					<div class="p-4">
 						<p class="text-[10px] font-bold tracking-[0.15em] text-foreground/50 uppercase">
 							Current Balance
 						</p>
@@ -438,7 +439,7 @@
 					{#if targetUser.isActive}
 						<button
 							onclick={() => (activeTab = 'FUNDS')}
-							class="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[12px] font-bold text-background transition-transform active:scale-95"
+							class="mr-4 flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[12px] font-bold text-background transition-transform active:scale-95"
 						>
 							<Wallet size={14} strokeWidth={2.5} /> Manage Funds
 						</button>
@@ -771,9 +772,10 @@
 			<!-- 2. ERROR STATE -->
 			{#if otpError && !isGeneratingOtp}
 				<div
-					class="mt-4 space-y-2 rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-destructive"
+					class="mt-4 flex items-start gap-2.5 rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-destructive"
 				>
-					<p class="text-[13px] font-semibold">{otpError}</p>
+					<AlertCircle size={16} class="mt-0.5 shrink-0" />
+					<p class="text-[13px] leading-normal font-semibold">{otpError}</p>
 				</div>
 				<div class="mt-6">
 					<button

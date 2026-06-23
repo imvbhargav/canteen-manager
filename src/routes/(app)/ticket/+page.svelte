@@ -169,7 +169,7 @@
 
 			const result = await response.json();
 
-			if (result.success && result.ticket) {
+			if (response.ok && result.success && result.ticket) {
 				fallbackState = 'confirmed';
 
 				completedTicket = { ...appState.activeTicket };
@@ -224,7 +224,7 @@
 					};
 				} = await response.json();
 
-				if (result.success && result.data) {
+				if (response.ok && result.success && result.data) {
 					completedTicket = { ...appState.activeTicket };
 					completedTotal = Number(result.data.totalAmount);
 					completedTicketRef = result.data.ticketReference;
@@ -235,6 +235,7 @@
 					scanState = 'success';
 				} else {
 					scanState = 'error';
+					// Catches engine-off validation faults cleanly from camera scans
 					manualError = result.error || 'The system could not finish processing checkout.';
 				}
 			} catch (err: unknown) {

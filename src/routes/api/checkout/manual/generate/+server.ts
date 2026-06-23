@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { users, manualOrderOtps } from '$lib/server/db/schema';
+import { users, manualOrderOtps, engines } from '$lib/server/db/schema';
 import type { RequestHandler } from './$types';
 import { eq } from 'drizzle-orm';
 
@@ -9,23 +9,27 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const { userId } = await request.json();
+	const { userId } = (await request.json()) as { userId: string };
 	if (!userId) {
 		return json({ success: false, error: 'User ID is required' }, { status: 400 });
 	}
 
 	try {
-		// Fetch Admin verification details and target user state concurrently
-		const [adminCheck, targetUser] = await Promise.all([
+		// Fetch Admin status, target user details, and active engine configuration concurrently
+		const [adminCheck, targetUser, activeEngine] = await Promise.all([
 			db.query.users.findFirst({
 				where: eq(users.id, locals.user.id),
 				columns: { role: true }
 			}),
 			db.query.users.findFirst({
 				where: eq(users.id, userId)
+			}),
+			db.query.engines.findFirst({
+				where: eq(engines.isOn, true)
 			})
 		]);
 
+		// Authorization & Identity Guards
 		if (!adminCheck || adminCheck.role !== 'ADMIN') {
 			return json({ success: false, error: 'Unauthorized' }, { status: 401 });
 		}
@@ -34,6 +38,24 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			return json({ success: false, error: 'Active student not found' }, { status: 404 });
 		}
 
+		// Global Engine Heartbeat Validation Guard
+		const FIVE_MINUTES_IN_MS = 5 * 60 * 1000;
+		const lastPingTime = activeEngine?.lastPingedAt
+			? new Date(activeEngine.lastPingedAt).getTime()
+			: 0;
+		const isEngineDead = Date.now() - lastPingTime > FIVE_MINUTES_IN_MS;
+
+		if (!activeEngine || isEngineDead) {
+			return json(
+				{
+					success: false,
+					error: 'Action rejected: No active order processing engine is online right now.'
+				},
+				{ status: 400 }
+			);
+		}
+
+		// 3. Complete Generation Parameters
 		const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 		const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 

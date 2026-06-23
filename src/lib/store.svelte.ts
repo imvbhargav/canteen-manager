@@ -65,12 +65,11 @@ export const appState = $state<{
 });
 
 // Reactivity
-
 $effect.root(() => {
 	// When the wallet changes (login / logout / user switch), reload persisted
 	// data for the incoming user and clear it when no user is present.
 	$effect(() => {
-		const id = appState.wallet?.studentId;
+		const id = appState.wallet?.referenceKey;
 		if (id) {
 			appState.cart = loadCart(id);
 			appState.activeTicket = loadTicket(id);
@@ -80,15 +79,44 @@ $effect.root(() => {
 		}
 	});
 
+	// 5-Minute Wallet Balance Polling
+	$effect(() => {
+		// Track the reference key to kick off/restart when a valid user logs in
+		const id = appState.wallet?.referenceKey;
+		if (!id) return;
+
+		// 5 minutes in milliseconds
+		const INTERVAL_MS = 5 * 60 * 1000;
+
+		const fetchLatestWallet = async () => {
+			try {
+				// Fetch from your user/session API endpoint
+				const res = await fetch('/api/wallet');
+				if (res.ok && appState.wallet) {
+					const updatedWallet = await res.json();
+					// Update only the balance or the whole wallet object
+					appState.wallet.balance = Number(updatedWallet.balance);
+				}
+			} catch (err) {
+				console.error('Failed to auto-refresh wallet balance:', err);
+			}
+		};
+
+		const interval = setInterval(fetchLatestWallet, INTERVAL_MS);
+
+		// Cleanup interval when user logs out or referenceKey changes
+		return () => clearInterval(interval);
+	});
+
 	// Persist cart — only runs when a user is logged in.
 	$effect(() => {
-		const id = appState.wallet?.studentId;
+		const id = appState.wallet?.referenceKey;
 		if (id) saveCart(id, appState.cart);
 	});
 
 	// Persist active ticket — only runs when a user is logged in.
 	$effect(() => {
-		const id = appState.wallet?.studentId;
+		const id = appState.wallet?.referenceKey;
 		if (id) saveTicket(id, appState.activeTicket);
 	});
 });

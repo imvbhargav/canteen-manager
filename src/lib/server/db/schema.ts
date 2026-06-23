@@ -121,6 +121,13 @@ export const menuItems = pgTable(
 	(table) => [check('menu_items_price_check', sql`${table.price} >= 0`)]
 );
 
+export const engines = pgTable('engines', {
+	id: text('id').primaryKey().notNull(),
+	isOn: boolean('is_on').default(false).notNull(),
+	priority: integer('priority').default(1).notNull(),
+	lastPingedAt: timestamp('last_pinged_at').defaultNow().notNull()
+});
+
 export const counters = pgTable('counters', {
 	id: uuid('id').defaultRandom().primaryKey(),
 	counterNumber: integer('counter_number').notNull().unique(),
