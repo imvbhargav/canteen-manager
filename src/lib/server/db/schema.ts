@@ -19,8 +19,9 @@ export const categoryEnum = pgEnum('menu_category', ['Breakfast', 'Lunch', 'Snac
 export const dietaryEnum = pgEnum('dietary_type', ['veg', 'non-veg']);
 export const ticketStatusEnum = pgEnum('ticket_status', [
 	'PENDING',
-	'READY',
+	'PRINTING',
 	'COMPLETED',
+	'FAILED',
 	'CANCELLED'
 ]);
 export const transactionTypeEnum = pgEnum('transaction_type', ['CREDIT', 'DEBIT']);
@@ -44,11 +45,6 @@ export const paymentProviderEnum = pgEnum('payment_provider', [
 	'UPI'
 ]);
 export const counterStatusEnum = pgEnum('counter_status', ['ACTIVE', 'PRINTER_ISSUE', 'OFFLINE']);
-export const ticketPrintStatusEnum = pgEnum('ticket_print_status', [
-	'PENDING',
-	'PRINTED',
-	'FAILED'
-]);
 export const printerTypeEnum = pgEnum('printer_type', ['LAN', 'BT', 'USB', 'NONE']);
 
 export const users = pgTable(
@@ -172,7 +168,6 @@ export const tickets = pgTable(
 			.references(() => counters.id, { onDelete: 'restrict' }),
 		totalAmount: numeric('total_amount', { precision: 10, scale: 2 }).notNull(),
 		status: ticketStatusEnum('status').default('PENDING').notNull(),
-		printStatus: ticketPrintStatusEnum('print_status').default('PENDING').notNull(),
 		printErrorReason: text('print_error_reason'),
 		printedAt: timestamp('printed_at', { withTimezone: true }),
 		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -180,7 +175,7 @@ export const tickets = pgTable(
 	},
 	(table) => [
 		check('tickets_total_check', sql`${table.totalAmount} >= 0`),
-		index('idx_tickets_pending_timeout').on(table.status, table.printStatus, table.createdAt)
+		index('idx_tickets_timeout').on(table.status, table.createdAt)
 	]
 );
 

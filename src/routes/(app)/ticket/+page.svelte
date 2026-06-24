@@ -220,7 +220,6 @@
 						ticketReference: string;
 						totalAmount: string;
 						status: string;
-						printStatus: string;
 					};
 				} = await response.json();
 

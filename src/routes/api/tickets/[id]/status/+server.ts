@@ -3,8 +3,8 @@ import { db } from '$lib/server/db';
 import { tickets } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 
-// Allowed status changes based on your pgEnum
-const VALID_STATUSES = ['PENDING', 'READY', 'COMPLETED', 'CANCELLED'] as const;
+// Allowed status changes
+const VALID_STATUSES = ['PENDING', 'PRINTING', 'COMPLETED', 'FAILED', 'CANCELLED'] as const;
 type TicketStatus = (typeof VALID_STATUSES)[number];
 
 export const PATCH: RequestHandler = async ({ params, request }) => {
@@ -14,15 +14,9 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 	}
 
 	// Strict Request Identifier Validation
-	const requestId = request.headers.get('x-request-id');
-	if (!requestId) {
-		return json(
-			{
-				success: false,
-				error: 'Bad Request: Missing strict X-Request-Id header identification bounds'
-			},
-			{ status: 400 }
-		);
+	const engineToken = request.headers.get('X-Engine-Token');
+	if (engineToken !== '38d6960a32cda66ce327d44d358755f706420303e11825a34eca38544a07e2c7') {
+		return json({ success: false, error: 'Unauthorized hub execution access' }, { status: 401 });
 	}
 
 	try {
@@ -62,8 +56,7 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 		const [updatedTicket] = await db
 			.update(tickets)
 			.set({
-				status: status as TicketStatus,
-				...(status === 'COMPLETED' ? { printStatus: 'PRINTED' } : {})
+				status: status as TicketStatus
 			})
 			.where(eq(tickets.id, ticketId))
 			.returning();

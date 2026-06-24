@@ -87,8 +87,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					userId: activeUserId,
 					counterId: activeCounter.id,
 					totalAmount: totalAmount.toFixed(2),
-					status: 'PENDING',
-					printStatus: 'PENDING'
+					status: 'PENDING'
 				})
 				.returning();
 
