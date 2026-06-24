@@ -46,7 +46,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			ticketReference: o.ticketReference || '',
 			netTotal: String(o.totalAmount),
 			createdAt: o.createdAt.toISOString(),
-			status: 'PENDING', // Leaves it safe to allow a 10-minute retry manual print execution window locally
+			status: o.status || 'PENDING', // Leaves it safe to allow a 10-minute retry manual print execution window locally
 			items: o.items.map((i) => {
 				// Safely calculate line item total safely using float parsing contextually
 				const computedTotal = (
