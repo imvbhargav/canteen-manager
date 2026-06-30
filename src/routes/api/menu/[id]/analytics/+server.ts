@@ -40,7 +40,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 		}
 		// range === 'all' → dateFilter stays sql`true`
 
-		const statusFilter = sql`${tickets.status} IN ('COMPLETED', 'READY', 'PENDING')`;
+		const statusFilter = sql`${tickets.status} IN ('COMPLETED', 'PRINTING')`;
 
 		const statsResult = await db
 			.select({

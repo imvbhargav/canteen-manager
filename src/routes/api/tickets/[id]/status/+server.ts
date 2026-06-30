@@ -2,21 +2,22 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { tickets } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
+import { authorizeRequest } from '$lib/server/db/helpers/authorizeRequest';
 
 // Allowed status changes
 const VALID_STATUSES = ['PENDING', 'PRINTING', 'COMPLETED', 'FAILED', 'CANCELLED'] as const;
 type TicketStatus = (typeof VALID_STATUSES)[number];
 
-export const PATCH: RequestHandler = async ({ params, request }) => {
+export const PATCH: RequestHandler = async ({ params, locals, request }) => {
 	const ticketId = params.id;
 	if (!ticketId) {
 		return json({ success: false, error: 'Missing ticket ID parameter' }, { status: 400 });
 	}
 
 	// Strict Request Identifier Validation
-	const engineToken = request.headers.get('X-Engine-Token');
-	if (engineToken !== '38d6960a32cda66ce327d44d358755f706420303e11825a34eca38544a07e2c7') {
-		return json({ success: false, error: 'Unauthorized hub execution access' }, { status: 401 });
+	const auth = await authorizeRequest(request, locals);
+	if (!auth.authorized) {
+		return json({ success: false, error: auth.error }, { status: auth.status });
 	}
 
 	try {

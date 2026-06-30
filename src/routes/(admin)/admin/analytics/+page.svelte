@@ -15,11 +15,13 @@
 		Minus,
 		User,
 		Search,
-		X
+		X,
+		Edit2
 	} from 'lucide-svelte';
 	import { formatCurrencyINR } from '$lib';
 	import { SvelteDate, SvelteURLSearchParams } from 'svelte/reactivity';
 	import AppLogo from '$lib/components/AppLogo.svelte';
+	import { resolve } from '$app/paths';
 
 	interface Summary {
 		totalRevenue: string;
@@ -195,6 +197,9 @@
 			: null
 	);
 
+	let selectedOrderForUpdate: OrderFeedRecord | null = $state<OrderFeedRecord | null>(null);
+	let isUpdatingStatus: boolean = $state(false);
+
 	onMount(() => {
 		executeTabSyncLoad();
 	});
@@ -272,6 +277,34 @@
 			console.error(err);
 		} finally {
 			isFetchingOrdersFeed = false;
+		}
+	}
+
+	async function updateOrderStatus(
+		orderId: string,
+		newStatus: 'COMPLETED' | 'CANCELLED'
+	): Promise<void> {
+		isUpdatingStatus = true;
+		try {
+			const res = await fetch(resolve('/api/tickets/[id]/status', { id: orderId }), {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-Engine-Token': '38d6960a32cda66ce327d44d358755f706420303e11825a34eca38544a07e2c7'
+				},
+				body: JSON.stringify({ status: newStatus })
+			});
+			const json = await res.json();
+			if (res.ok && json.success) {
+				feedOrders = feedOrders.map((o: OrderFeedRecord) =>
+					o.id === orderId ? { ...o, status: newStatus } : o
+				);
+				selectedOrderForUpdate = null;
+			}
+		} catch (err) {
+			console.error(err);
+		} finally {
+			isUpdatingStatus = false;
 		}
 	}
 
@@ -396,7 +429,13 @@
 			text: 'text-destructive',
 			bg: 'bg-destructive/10'
 		},
-		READY: { dot: 'bg-violet-400', label: 'Ready', text: 'text-violet-600', bg: 'bg-violet-500/10' }
+		READY: {
+			dot: 'bg-violet-400',
+			label: 'Ready',
+			text: 'text-violet-600',
+			bg: 'bg-violet-500/10'
+		},
+		PRINTING: { dot: 'bg-cyan-400', label: 'Printing', text: 'text-cyan-600', bg: 'bg-cyan-500/10' }
 	};
 
 	const CATEGORY_COLORS: string[] = [
@@ -1003,7 +1042,7 @@
 							<div class="flex flex-col bg-card p-4">
 								<div class="flex items-start justify-between gap-2">
 									<div class="min-w-0 flex-1">
-										<div class="flex items-center gap-2">
+										<div class="flex flex-wrap items-center gap-2">
 											<span class="font-mono text-[14px] font-bold text-foreground"
 												>{order.ticketReference}</span
 											>
@@ -1011,6 +1050,14 @@
 												class="rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase {style.bg} {style.text}"
 												>{order.status}</span
 											>
+											{#if order.status === 'PRINTING'}
+												<button
+													onclick={() => (selectedOrderForUpdate = order)}
+													class="flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary active:scale-95"
+												>
+													<Edit2 size={10} /> Update Status
+												</button>
+											{/if}
 										</div>
 										<div
 											class="mt-1 flex items-center gap-1 text-[12px] font-bold text-foreground/60"
@@ -1075,3 +1122,47 @@
 		{/if}
 	</div>
 </div>
+
+{#if selectedOrderForUpdate}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+	>
+		<div class="w-full max-w-sm rounded-2xl border border-muted/30 bg-card p-5 shadow-lg">
+			<h4 class="mb-1 text-[15px] font-bold text-foreground">Update Order Status</h4>
+			<p class="mb-4 font-mono text-[12px] text-foreground/50">
+				Ticket: {selectedOrderForUpdate.ticketReference}
+			</p>
+
+			<div class="mb-4 space-y-2">
+				<button
+					onclick={() => updateOrderStatus(selectedOrderForUpdate!.id, 'COMPLETED')}
+					disabled={isUpdatingStatus}
+					class="flex w-full items-center justify-between rounded-xl bg-emerald-500/10 px-4 py-2.5 text-left text-[13px] font-bold text-emerald-600 transition-colors hover:bg-emerald-500/20"
+				>
+					<span>Mark as Completed</span>
+				</button>
+				<button
+					onclick={() => updateOrderStatus(selectedOrderForUpdate!.id, 'CANCELLED')}
+					disabled={isUpdatingStatus}
+					class="flex w-full items-center justify-between rounded-xl bg-destructive/10 px-4 py-2.5 text-left text-[13px] font-bold text-destructive transition-colors hover:bg-destructive/20"
+				>
+					<span>Cancel & Refund Order</span>
+				</button>
+			</div>
+
+			{#if isUpdatingStatus}
+				<div class="flex items-center justify-center py-2">
+					<Loader2 size={20} class="animate-spin text-primary" />
+				</div>
+			{/if}
+
+			<button
+				onclick={() => (selectedOrderForUpdate = null)}
+				disabled={isUpdatingStatus}
+				class="w-full rounded-xl bg-muted/40 py-2 text-[12px] font-bold text-foreground transition-all hover:bg-muted/60"
+			>
+				Close
+			</button>
+		</div>
+	</div>
+{/if}

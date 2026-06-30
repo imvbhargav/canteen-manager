@@ -15,7 +15,8 @@
 		Clock,
 		CheckCircle2,
 		Circle,
-		BarChart3
+		BarChart3,
+		CircleX
 	} from 'lucide-svelte';
 	import { resolve } from '$app/paths';
 	import { SvelteDate } from 'svelte/reactivity';
@@ -47,7 +48,7 @@
 		ticketId: string;
 		ticketReference: string;
 		totalAmount: string;
-		status: 'PENDING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+		status: 'PENDING' | 'PRINTING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 		createdAt: string;
 		quantity: number;
 		unitPrice: string;
@@ -615,8 +616,10 @@
 													strokeWidth={2.5}
 													class="shrink-0 text-emerald-500"
 												/>
-											{:else if order.status === 'READY'}
+											{:else if order.status === 'PRINTING'}
 												<Circle size={11} strokeWidth={2.5} class="shrink-0 text-blue-500" />
+											{:else if order.status === 'CANCELLED'}
+												<CircleX size={11} strokeWidth={2.5} class="shrink-0 text-red-500" />
 											{:else}
 												<Clock size={11} strokeWidth={2.5} class="shrink-0 text-amber-500" />
 											{/if}
@@ -648,11 +651,13 @@
 										class="rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-widest uppercase
 										{order.status === 'COMPLETED'
 											? 'bg-emerald-500/10 text-emerald-500'
-											: order.status === 'READY'
+											: order.status === 'PRINTING'
 												? 'bg-blue-500/10 text-blue-500'
 												: order.status === 'PENDING'
 													? 'bg-amber-500/10 text-amber-500'
-													: 'bg-muted/20 text-foreground/40'}"
+													: order.status === 'CANCELLED'
+														? 'bg-red-500/10 text-red-500'
+														: 'bg-muted/20 text-foreground/40'}"
 									>
 										{order.status}
 									</span>

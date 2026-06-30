@@ -1,11 +1,10 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { tickets, users } from '$lib/server/db/schema';
-import { eq, and, gte, lte, lt, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, lt, desc, inArray } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals, url }) => {
-	// Admin Check
 	if (!locals.user) return json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
 	const adminCheck = await db.query.users.findFirst({
@@ -17,23 +16,20 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	}
 
 	try {
-		// Search and parsing parameters
 		const ticketReference = url.searchParams.get('ticketReference');
 		const startDateParam = url.searchParams.get('startDate');
 		const endDateParam = url.searchParams.get('endDate');
+		const statusParam = url.searchParams.get('status');
 		const cursor = url.searchParams.get('cursor');
 
 		const limitParam = parseInt(url.searchParams.get('limit') || '15', 10);
 		const limit = limitParam > 0 && limitParam <= 50 ? limitParam : 15;
 
-		// Dynamic condition setup
 		let conditions;
 
 		if (ticketReference) {
-			// If searching by a specific ticket reference, narrow down directly to it
 			conditions = eq(tickets.ticketReference, ticketReference.toUpperCase());
 		} else {
-			// Otherwise, enforce and use the date range validation
 			if (!startDateParam || !endDateParam) {
 				return json(
 					{
@@ -44,21 +40,41 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 				);
 			}
 
-			conditions = and(
+			const queryConditions = [
 				gte(tickets.createdAt, new Date(startDateParam)),
 				lte(tickets.createdAt, new Date(endDateParam))
-			);
+			];
 
-			// Append cursor condition if paginating
-			if (cursor) {
-				conditions = and(conditions, lt(tickets.createdAt, new Date(cursor)));
+			if (statusParam) {
+				const parsedStatuses = statusParam
+					.split(',')
+					.map(
+						(s) =>
+							s.trim().toUpperCase() as
+								| 'PENDING'
+								| 'PRINTING'
+								| 'COMPLETED'
+								| 'FAILED'
+								| 'CANCELLED'
+					)
+					.filter((s) => ['PENDING', 'PRINTING', 'COMPLETED', 'FAILED', 'CANCELLED'].includes(s));
+
+				if (parsedStatuses.length > 0) {
+					queryConditions.push(inArray(tickets.status, parsedStatuses));
+				}
 			}
+
+			if (cursor) {
+				queryConditions.push(lt(tickets.createdAt, new Date(cursor)));
+			}
+
+			conditions = and(...queryConditions);
 		}
 
 		const orderRecords = await db.query.tickets.findMany({
 			where: conditions,
 			orderBy: [desc(tickets.createdAt)],
-			limit: limit + 1, // Fetch an extra record to determine next page
+			limit: limit + 1,
 			with: {
 				user: {
 					columns: { name: true, referenceKey: true, accountNumber: true }
@@ -76,7 +92,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 
 		if (orderRecords.length > limit) {
 			hasNextPage = true;
-			orderRecords.pop(); // Remove the extra check element
+			orderRecords.pop();
 			const lastItem = orderRecords[orderRecords.length - 1];
 			nextCursor = lastItem.createdAt.toISOString();
 		}
