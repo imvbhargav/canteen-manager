@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Info, Loader2, LogOut, Printer, Download, QrCode } from 'lucide-svelte';
-	import { resolve } from '$app/paths';
-	import { goto } from '$app/navigation';
-	import AppLogo from '$lib/components/AppLogo.svelte';
+	import { Info, Loader2, Printer, Download, QrCode } from 'lucide-svelte';
+	import AdminHeader from '$lib/components/AdminHeader.svelte';
+	import CardSkeleton from '$lib/components/CardSkeleton.svelte';
 
 	type Counter = {
 		id: string;
@@ -18,7 +17,6 @@
 	let counters: Counter[] = $state([]);
 	let isLoading: boolean = $state(true);
 	let processingId: string | null = $state(null);
-	let isLoggingOut: boolean = $state(false);
 
 	// QR Download States
 	let isDownloadingAll: boolean = $state(false);
@@ -124,57 +122,12 @@
 			isDownloadingAll = false;
 		}
 	}
-
-	async function handleLogout(): Promise<void> {
-		if (isLoggingOut) return;
-		isLoggingOut = true;
-
-		try {
-			const res: Response = await fetch('/api/auth/logout', { method: 'POST' });
-			if (res.ok) {
-				goto(resolve('/login'));
-			} else {
-				console.error('Logout failed');
-				isLoggingOut = false;
-			}
-		} catch {
-			console.error('Network error during logout');
-			isLoggingOut = false;
-		}
-	}
 </script>
 
 <svelte:head><title>Counters | MunchUp Admin</title></svelte:head>
 
 <div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
-	<header
-		class="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-3 bg-background/15 px-5 backdrop-blur-md"
-	>
-		<div>
-			<AppLogo />
-		</div>
-		<div class="flex items-center justify-end gap-3">
-			<div
-				class="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-600"
-			>
-				<div class="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
-				<span class="text-[9px] font-bold tracking-widest uppercase">Online</span>
-			</div>
-
-			<button
-				onclick={handleLogout}
-				disabled={isLoggingOut}
-				class="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90 disabled:opacity-50"
-				title="Log Out"
-			>
-				{#if isLoggingOut}
-					<Loader2 size={16} strokeWidth={2.5} class="animate-spin" />
-				{:else}
-					<LogOut size={16} strokeWidth={2.5} />
-				{/if}
-			</button>
-		</div>
-	</header>
+	<AdminHeader showLogout />
 
 	<div class="flex-1 space-y-5 px-5 pt-4 pb-10">
 		<div
@@ -210,19 +163,7 @@
 
 		<div class="space-y-3">
 			{#if isLoading}
-				{#each Array.from({ length: 3 }, (_, i) => i) as i (i)}
-					<div
-						class="flex animate-pulse flex-col gap-4 rounded-[20px] border border-muted/30 bg-card p-4"
-					>
-						<div class="flex items-center gap-3">
-							<div class="h-10 w-10 rounded-xl bg-muted/40"></div>
-							<div class="flex-1 space-y-2">
-								<div class="h-4 w-32 rounded-full bg-muted/60"></div>
-								<div class="h-3 w-16 rounded-full bg-muted/40"></div>
-							</div>
-						</div>
-					</div>
-				{/each}
+				<CardSkeleton type="counter" count={3} />
 			{:else if counters.length > 0}
 				{#each counters as counter (counter.id)}
 					<div

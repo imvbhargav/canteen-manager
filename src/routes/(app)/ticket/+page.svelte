@@ -2,7 +2,6 @@
 	import { appState } from '$lib/store.svelte';
 	import { goto } from '$app/navigation';
 	import {
-		ArrowLeft,
 		QrCode,
 		ScanLine,
 		CheckCircle,
@@ -20,6 +19,12 @@
 	import type { QRCode } from 'jsqr';
 	import { resolve } from '$app/paths';
 	import { formatCurrencyINR } from '$lib';
+	import SubPageHeader from '$lib/components/SubPageHeader.svelte';
+
+	function handleBack() {
+		stopCamera();
+		goto(resolve('/'));
+	}
 
 	type ScanState = 'idle' | 'starting' | 'scanning' | 'processing' | 'success' | 'error';
 	type FallbackState = 'hidden' | 'open' | 'submitting' | 'confirmed';
@@ -256,30 +261,17 @@
 <div
 	class="animate-in fade-in absolute inset-0 z-20 flex flex-col overflow-y-auto bg-background duration-300"
 >
-	<header
-		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
-	>
-		<a
-			href={resolve('/')}
-			onclick={stopCamera}
-			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
-		>
-			<ArrowLeft size={18} strokeWidth={2.5} />
-		</a>
+	{#snippet rightSection()}
+		{#if (appState.activeTicket?.items.length ?? 0) > 0}
+			<div class="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5">
+				<ShoppingBag size={15} strokeWidth={2.5} class="text-primary" />
+				<span class="text-[13px] font-bold text-primary">{appState.activeTicket?.items.length}</span
+				>
+			</div>
+		{/if}
+	{/snippet}
 
-		<h2 class="flex-1 text-[20px] font-bold tracking-tight text-foreground">Order Ticket</h2>
-
-		<div class="flex w-20 justify-end">
-			{#if (appState.activeTicket?.items.length ?? 0) > 0}
-				<div class="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5">
-					<ShoppingBag size={15} strokeWidth={2.5} class="text-primary" />
-					<span class="text-[13px] font-bold text-primary"
-						>{appState.activeTicket?.items.length}</span
-					>
-				</div>
-			{/if}
-		</div>
-	</header>
+	<SubPageHeader title="Order Ticket" onclickBack={handleBack} {rightSection} />
 
 	<div class="px-5 pt-1 pb-8">
 		{#if scanState === 'success' && completedTicket}
@@ -557,7 +549,7 @@
 				{/if}
 
 				{#if scanState !== 'success' && scanState !== 'processing' && fallbackState !== 'confirmed'}
-					<div class="overflow-hidden rounded-3xl border border-muted/30 bg-card shadow-sm">
+					<div class="hidden overflow-hidden rounded-3xl border border-muted/30 bg-card shadow-sm">
 						{#if fallbackState === 'hidden'}
 							<button
 								onclick={openFallback}

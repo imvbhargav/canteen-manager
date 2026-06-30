@@ -3,6 +3,7 @@ import { db } from '$lib/server/db';
 import { eq, desc } from 'drizzle-orm';
 import { counters } from '$lib/server/db/schema';
 import { authorizeRequest } from '$lib/server/db/helpers/authorizeRequest';
+import { handleServerError } from '$lib/server/api';
 
 // GET: Fetch all active counters for the Android App dropdown
 export const GET: RequestHandler = async ({ request, locals }) => {
@@ -20,8 +21,7 @@ export const GET: RequestHandler = async ({ request, locals }) => {
 
 		return json({ success: true, data: activeCounters });
 	} catch (error) {
-		console.error('Failed to fetch counters:', error);
-		return json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+		return handleServerError(error, 'Failed to fetch counters');
 	}
 };
 
@@ -60,6 +60,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ success: false, error: 'Counter number already exists' }, { status: 409 });
 		}
 
-		return json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+		return handleServerError(error, 'Failed to create counter');
 	}
 };

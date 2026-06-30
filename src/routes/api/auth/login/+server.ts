@@ -5,6 +5,7 @@ import { eq, or, and, sql, count } from 'drizzle-orm';
 import { generateSessionToken, hashSessionToken, verifyPin } from '$lib/server/auth';
 import type { RequestHandler } from './$types';
 import { dev } from '$app/environment';
+import { handleServerError } from '$lib/server/api';
 
 // Rate Limiting Configuration
 const MAX_ATTEMPTS = 5;
@@ -132,7 +133,6 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
 			message: 'Logged in successfully'
 		});
 	} catch (err) {
-		console.error('Login error:', err);
-		return json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+		return handleServerError(err, 'Login error');
 	}
 };

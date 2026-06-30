@@ -11,41 +11,22 @@
 		Coffee,
 		Pizza,
 		Sandwich,
-		Clock,
-		Utensils,
-		CheckCircle2,
-		XCircle,
-		ReceiptText,
 		Settings,
 		CreditCard,
 		User,
 		History,
-		LogOut
+		LogOut,
+		ReceiptText
 	} from 'lucide-svelte';
 	import { resolve } from '$app/paths';
-	import type { MenuItem } from '$lib/types';
+	import type { MenuItem, APITicket, APITicketItem } from '$lib/types';
 	import AppLogo from '$lib/components/AppLogo.svelte';
-	import { formatCurrencyINR } from '$lib';
+	import DietaryIcon from '$lib/components/DietaryIcon.svelte';
+	import { formatCurrencyINR, getStatusConfig } from '$lib';
 
-	type TicketItem = {
-		id: string;
-		quantity: number;
-		unitPrice: string;
-		menuItem: MenuItem;
-	};
 
-	type Ticket = {
-		id: string;
-		ticketReference: string;
-		totalAmount: string;
-		status: 'PENDING' | 'READY' | 'COMPLETED' | 'CANCELLED';
-		createdAt: string;
-		items: TicketItem[];
-		formattedDate?: string;
-		totalItems?: number;
-	};
 
-	let activeOrders: Ticket[] = $state([]);
+	let activeOrders: APITicket[] = $state([]);
 	let isLoadingOrders: boolean = $state(true);
 
 	// Dropdown state engine
@@ -55,14 +36,14 @@
 		isLoadingOrders = true;
 		fetch('/api/orders?status=PENDING&status=READY&limit=5')
 			.then((res: Response) => res.json())
-			.then((result: { success: boolean; data: { tickets: Ticket[] } }) => {
+			.then((result: { success: boolean; data: { tickets: APITicket[] } }) => {
 				if (result.success) {
-					activeOrders = result.data.tickets.map((t: Ticket): Ticket => {
+					activeOrders = result.data.tickets.map((t: APITicket): APITicket => {
 						const d: Date = new Date(t.createdAt);
 						return {
 							...t,
 							formattedDate: `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`,
-							totalItems: t.items.reduce((acc: number, item: TicketItem) => acc + item.quantity, 0)
+							totalItems: t.items.reduce((acc: number, item: APITicketItem) => acc + item.quantity, 0)
 						};
 					});
 				}
@@ -105,20 +86,7 @@
 		goto(resolve('/menu'));
 	}
 
-	function getStatusConfig(status: string) {
-		switch (status) {
-			case 'COMPLETED':
-				return { icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' };
-			case 'READY':
-				return { icon: Utensils, color: 'text-blue-500', bg: 'bg-blue-500/10' };
-			case 'PENDING':
-				return { icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' };
-			case 'CANCELLED':
-				return { icon: XCircle, color: 'text-destructive', bg: 'bg-destructive/10' };
-			default:
-				return { icon: ReceiptText, color: 'text-foreground/50', bg: 'bg-muted/50' };
-		}
-	}
+
 
 	type CategoryConfig = {
 		Icon: typeof Sunrise;
@@ -556,18 +524,7 @@
 													>
 													<div class="flex min-w-0 items-center gap-1.5">
 														{#if item.menuItem}
-															<div
-																class="flex h-3 w-3 shrink-0 items-center justify-center rounded-md border {item
-																	.menuItem.dietary === 'veg'
-																	? 'border-emerald-500/40 bg-emerald-500/5'
-																	: 'border-rose-500/40 bg-rose-500/5'}"
-															>
-																<div
-																	class="h-1 w-1 rounded-full {item.menuItem.dietary === 'veg'
-																		? 'bg-emerald-500'
-																		: 'bg-rose-500'}"
-																></div>
-															</div>
+															<DietaryIcon dietary={item.menuItem.dietary} class="h-3 w-3" />
 															<span class="truncate font-bold tracking-tight text-foreground/70"
 																>{item.menuItem.name}</span
 															>

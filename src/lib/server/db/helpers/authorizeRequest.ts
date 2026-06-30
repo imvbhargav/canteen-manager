@@ -1,29 +1,26 @@
-import { eq } from 'drizzle-orm';
-import { db } from '..';
-import { users } from '../schema';
+import { verifyEngineToken, requireAdmin } from '$lib/server/api';
 
 // Reusable non-destructive authorization helper
 export const authorizeRequest = async (
 	request: Request,
 	locals: App.Locals
 ): Promise<{ authorized: boolean; status: number; error?: string }> => {
-	const engineToken = request.headers.get('X-Engine-Token');
-	const isEngine =
-		engineToken &&
-		engineToken === '38d6960a32cda66ce327d44d358755f706420303e11825a34eca38544a07e2c7';
-
-	if (!isEngine) {
-		if (!locals.user) {
-			return { authorized: false, status: 401, error: 'Unauthorized: Missing session context' };
-		}
-
-		const adminCheck = await db.query.users.findFirst({
-			where: eq(users.id, locals.user.id),
-			columns: { role: true }
+	if (!verifyEngineToken(request)) {
+		const auth = await requireAdmin(locals, {
+			userError: 'Unauthorized: Missing session context',
+			userStatus: 401,
+			adminError: 'Unauthorized: Admin privileges required',
+			adminStatus: 403
 		});
-
-		if (!adminCheck || adminCheck.role !== 'ADMIN') {
-			return { authorized: false, status: 403, error: 'Unauthorized: Admin privileges required' };
+		if (!auth.authorized) {
+			return {
+				authorized: false,
+				status: auth.response!.status,
+				error:
+					auth.response!.status === 401
+						? 'Unauthorized: Missing session context'
+						: 'Unauthorized: Admin privileges required'
+			};
 		}
 	}
 

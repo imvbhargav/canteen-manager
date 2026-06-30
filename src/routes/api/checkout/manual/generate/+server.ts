@@ -3,10 +3,12 @@ import { db } from '$lib/server/db';
 import { users, manualOrderOtps, engines } from '$lib/server/db/schema';
 import type { RequestHandler } from './$types';
 import { eq } from 'drizzle-orm';
+import { requireAdmin, isEngineAlive, handleServerError } from '$lib/server/api';
 
 export const POST: RequestHandler = async ({ locals, request }) => {
-	if (!locals.user) {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const auth = await requireAdmin(locals);
+	if (!auth.authorized) {
+		return auth.response!;
 	}
 
 	const { userId } = (await request.json()) as { userId: string };
@@ -15,12 +17,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	try {
-		// Fetch Admin status, target user details, and active engine configuration concurrently
-		const [adminCheck, targetUser, activeEngine] = await Promise.all([
-			db.query.users.findFirst({
-				where: eq(users.id, locals.user.id),
-				columns: { role: true }
-			}),
+		// Fetch target user details and active engine configuration concurrently
+		const [targetUser, activeEngine] = await Promise.all([
 			db.query.users.findFirst({
 				where: eq(users.id, userId)
 			}),
@@ -29,23 +27,13 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			})
 		]);
 
-		// Authorization & Identity Guards
-		if (!adminCheck || adminCheck.role !== 'ADMIN') {
-			return json({ success: false, error: 'Unauthorized' }, { status: 401 });
-		}
-
+		// Identity Guard
 		if (!targetUser || !targetUser.isActive) {
 			return json({ success: false, error: 'Active student not found' }, { status: 404 });
 		}
 
 		// Global Engine Heartbeat Validation Guard
-		const FIVE_MINUTES_IN_MS = 5 * 60 * 1000;
-		const lastPingTime = activeEngine?.lastPingedAt
-			? new Date(activeEngine.lastPingedAt).getTime()
-			: 0;
-		const isEngineDead = Date.now() - lastPingTime > FIVE_MINUTES_IN_MS;
-
-		if (!activeEngine || isEngineDead) {
+		if (!activeEngine || !isEngineAlive(activeEngine.lastPingedAt)) {
 			return json(
 				{
 					success: false,
@@ -76,7 +64,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			}
 		});
 	} catch (error) {
-		console.error('Failed to generate manual OTP:', error);
-		return json({ success: false, error: 'Internal server error' }, { status: 500 });
+		return handleServerError(error, 'Failed to generate manual OTP', 'Internal server error');
 	}
 };

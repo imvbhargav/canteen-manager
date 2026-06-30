@@ -1,19 +1,10 @@
 <script lang="ts">
 	import { Loader2, Check, UploadCloud, X, Sparkles, Clock, AlertCircle } from 'lucide-svelte';
-	import { onMount } from 'svelte';
 	import AppLogo from '$lib/components/AppLogo.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import Tesseract from 'tesseract.js';
-
-	onMount(() => {
-		const setHeight = () => {
-			document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
-		};
-		setHeight();
-		window.addEventListener('resize', setHeight);
-		return () => window.removeEventListener('resize', setHeight);
-	});
+	import { sanitizeAlphanumeric } from '$lib';
 
 	let name = $state('');
 	let accountNumber = $state('');
@@ -37,7 +28,7 @@
 
 	function handleAlphanumericInput(e: Event, mode: 'account' | 'pin' | 'confirm') {
 		const target = e.target as HTMLInputElement;
-		const sanitized = target.value.replace(/[^a-zA-Z0-9]/g, '');
+		const sanitized = sanitizeAlphanumeric(target.value);
 
 		if (mode === 'account') accountNumber = sanitized;
 		if (mode === 'pin') pin = sanitized;

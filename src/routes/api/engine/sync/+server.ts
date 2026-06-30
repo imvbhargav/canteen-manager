@@ -2,10 +2,10 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { tickets } from '$lib/server/db/schema';
 import { gt, gte, inArray } from 'drizzle-orm';
+import { verifyEngineToken, handleServerError } from '$lib/server/api';
 
 export const POST: RequestHandler = async ({ request }) => {
-	const engineToken = request.headers.get('X-Engine-Token');
-	if (engineToken !== '38d6960a32cda66ce327d44d358755f706420303e11825a34eca38544a07e2c7') {
+	if (!verifyEngineToken(request)) {
 		return json({ success: false, error: 'Unauthorized hub execution access' }, { status: 401 });
 	}
 
@@ -66,7 +66,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			data: formattedTickets
 		});
 	} catch (error) {
-		console.error('[API-SYNC-ERROR] Failed parsing recovery payload:', error);
-		return json({ success: false, error: 'Internal pipeline sync failure' }, { status: 500 });
+		return handleServerError(
+			error,
+			'[API-SYNC-ERROR] Failed parsing recovery payload',
+			'Internal pipeline sync failure'
+		);
 	}
 };

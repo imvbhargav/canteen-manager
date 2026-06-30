@@ -4,6 +4,7 @@ import { eq, or, sql } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { users, payments, walletTransactions } from '$lib/server/db/schema';
 import { verifyPin } from '$lib/server/auth';
+import { requireAdmin, handleServerError } from '$lib/server/api';
 
 type PaymentProvider = 'CASH' | 'RAZORPAY' | 'STRIPE' | 'UPI';
 
@@ -17,8 +18,12 @@ interface TransactionRequest {
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	if (!locals.user || !locals.user.id) {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const auth = await requireAdmin(locals, {
+		adminError: 'Unauthorized. Admin access required.',
+		adminStatus: 403
+	});
+	if (!auth.authorized) {
+		return auth.response!;
 	}
 
 	const requestData = (await request.json()) as TransactionRequest;
@@ -33,18 +38,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	try {
 		const adminData = await db.query.users.findFirst({
-			where: eq(users.id, locals.user.id),
-			columns: { role: true, pinHash: true }
+			where: eq(users.id, auth.user!.id),
+			columns: { pinHash: true }
 		});
 
-		if (!adminData || adminData.role !== 'ADMIN') {
-			return json(
-				{ success: false, error: 'Unauthorized. Admin access required.' },
-				{ status: 403 }
-			);
-		}
-
-		if (!adminData.pinHash || !verifyPin(pin.toUpperCase(), adminData.pinHash)) {
+		if (!adminData || !adminData.pinHash || !verifyPin(pin.toUpperCase(), adminData.pinHash)) {
 			return json({ success: false, error: 'Invalid Admin PIN' }, { status: 403 });
 		}
 
@@ -123,7 +121,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			studentName: targetUser.name,
 			message: `Successfully ${actionText}`
 		});
-	} catch {
-		return json({ success: false, error: 'Transaction processing failed' }, { status: 500 });
+	} catch (error) {
+		return handleServerError(
+			error,
+			'Topup transaction processing failed',
+			'Transaction processing failed'
+		);
 	}
 };

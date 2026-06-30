@@ -1,18 +1,21 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { tickets, users } from '$lib/server/db/schema';
+import { tickets } from '$lib/server/db/schema';
 import { eq, and, gte, lte, lt, desc, inArray } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
+import {
+	requireAdmin,
+	getPaginationParams,
+	processPagination,
+	handleServerError
+} from '$lib/server/api';
 
 export const GET: RequestHandler = async ({ locals, url }) => {
-	if (!locals.user) return json({ success: false, error: 'Unauthorized' }, { status: 401 });
-
-	const adminCheck = await db.query.users.findFirst({
-		where: eq(users.id, locals.user.id),
-		columns: { role: true }
+	const auth = await requireAdmin(locals, {
+		adminStatus: 403
 	});
-	if (!adminCheck || adminCheck.role !== 'ADMIN') {
-		return json({ success: false, error: 'Unauthorized' }, { status: 403 });
+	if (!auth.authorized) {
+		return auth.response!;
 	}
 
 	try {
@@ -20,10 +23,8 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		const startDateParam = url.searchParams.get('startDate');
 		const endDateParam = url.searchParams.get('endDate');
 		const statusParam = url.searchParams.get('status');
-		const cursor = url.searchParams.get('cursor');
 
-		const limitParam = parseInt(url.searchParams.get('limit') || '15', 10);
-		const limit = limitParam > 0 && limitParam <= 50 ? limitParam : 15;
+		const { limit, cursor } = getPaginationParams(url, 15);
 
 		let conditions;
 
@@ -87,15 +88,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			}
 		});
 
-		let nextCursor: string | null = null;
-		let hasNextPage = false;
-
-		if (orderRecords.length > limit) {
-			hasNextPage = true;
-			orderRecords.pop();
-			const lastItem = orderRecords[orderRecords.length - 1];
-			nextCursor = lastItem.createdAt.toISOString();
-		}
+		const { hasNextPage, nextCursor } = processPagination(orderRecords, limit);
 
 		return json({
 			success: true,
@@ -105,7 +98,6 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			}
 		});
 	} catch (error) {
-		console.error('Failed to stream analytical orders:', error);
-		return json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+		return handleServerError(error, 'Failed to stream analytical orders');
 	}
 };

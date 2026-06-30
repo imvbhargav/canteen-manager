@@ -20,8 +20,9 @@
 	} from 'lucide-svelte';
 	import { formatCurrencyINR } from '$lib';
 	import { SvelteDate, SvelteURLSearchParams } from 'svelte/reactivity';
-	import AppLogo from '$lib/components/AppLogo.svelte';
 	import { resolve } from '$app/paths';
+	import AdminHeader from '$lib/components/AdminHeader.svelte';
+	import CardSkeleton from '$lib/components/CardSkeleton.svelte';
 
 	interface Summary {
 		totalRevenue: string;
@@ -454,13 +455,8 @@
 	class="animate-in fade-in absolute inset-0 z-20 flex flex-col overflow-y-auto bg-background duration-300"
 >
 	<header class="sticky top-0 z-30 border-b border-muted/20 bg-background/90 backdrop-blur-md">
-		<div
-			class="flex h-16 shrink-0 items-center justify-between gap-3 bg-background/15 px-5 backdrop-blur-md"
-		>
-			<div>
-				<AppLogo />
-			</div>
-			<div class="flex items-center justify-end gap-3">
+		<AdminHeader>
+			{#snippet rightSnippet()}
 				<div
 					class="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-600"
 				>
@@ -478,8 +474,8 @@
 						class={isLoading || isFetchingOrdersFeed ? 'animate-spin' : ''}
 					/>
 				</button>
-			</div>
-		</div>
+			{/snippet}
+		</AdminHeader>
 
 		<div class="flex items-center gap-2 px-4 pt-2 pb-1">
 			<div
@@ -576,9 +572,7 @@
 			{/if}
 
 			{#if isLoading && !data}
-				<div class="flex h-52 items-center justify-center">
-					<Loader2 size={30} strokeWidth={2.5} class="animate-spin text-primary" />
-				</div>
+				<CardSkeleton type="analytics" />
 			{:else if data}
 				{#if searchTicketRef}
 					<div
@@ -1024,7 +1018,9 @@
 					</div>
 				{/if}
 
-				{#if feedOrders.length === 0 && !isFetchingOrdersFeed}
+				{#if feedOrders.length === 0 && isFetchingOrdersFeed}
+					<CardSkeleton type="order" count={4} />
+				{:else if feedOrders.length === 0 && !isFetchingOrdersFeed}
 					<div class="rounded-2xl border border-muted/25 bg-card py-12 text-center">
 						<p class="text-[13px] font-medium text-foreground/30">
 							No orders registered during this timeframe.

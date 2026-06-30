@@ -6,6 +6,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { formatCurrencyINR } from '$lib';
+	import DietaryIcon from '$lib/components/DietaryIcon.svelte';
 
 	// ── Read ?category= param and pre-select the tab ──────────────────────────
 	const categoryOrder = ['Breakfast', 'Lunch', 'Snacks', 'Beverages'];
@@ -183,17 +184,7 @@
                             {qty > 0 ? 'bg-primary/5 ring-1 ring-primary/10' : 'hover:bg-muted/30'}"
 						>
 							<!-- Veg / non-veg marker badge -->
-							<div
-								class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center self-start rounded border
-                                {item.dietary === 'veg'
-									? 'border-emerald-500/50 bg-emerald-500/5'
-									: 'border-rose-500/50 bg-rose-500/5'}"
-							>
-								<div
-									class="h-1.5 w-1.5 rounded-full
-                                    {item.dietary === 'veg' ? 'bg-emerald-500' : 'bg-rose-500'}"
-								></div>
-							</div>
+							<DietaryIcon dietary={item.dietary} class="mt-0.5 self-start" />
 
 							<!-- Item descriptions metrics -->
 							<div class="min-w-0 flex-1">

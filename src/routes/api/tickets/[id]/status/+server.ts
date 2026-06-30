@@ -3,6 +3,7 @@ import { db } from '$lib/server/db';
 import { tickets } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { authorizeRequest } from '$lib/server/db/helpers/authorizeRequest';
+import { handleServerError } from '$lib/server/api';
 
 // Allowed status changes
 const VALID_STATUSES = ['PENDING', 'PRINTING', 'COMPLETED', 'FAILED', 'CANCELLED'] as const;
@@ -72,6 +73,6 @@ export const PATCH: RequestHandler = async ({ params, locals, request }) => {
 		});
 	} catch (error: unknown) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown exception';
-		return json({ success: false, error: errorMessage }, { status: 500 });
+		return handleServerError(error, 'Ticket status update failed', errorMessage);
 	}
 };

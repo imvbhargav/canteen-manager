@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import {
-		ArrowLeft,
 		ShoppingBag,
 		Users,
 		IndianRupee,
@@ -18,9 +17,11 @@
 		BarChart3,
 		CircleX
 	} from 'lucide-svelte';
-	import { resolve } from '$app/paths';
 	import { SvelteDate } from 'svelte/reactivity';
-	import { formatCurrencyINR } from '$lib';
+	import { formatCurrencyINR, formatDateTime, formatDateShort, formatDate } from '$lib';
+	import AdminHeader from '$lib/components/AdminHeader.svelte';
+	import CardSkeleton from '$lib/components/CardSkeleton.svelte';
+	import { resolve } from '$app/paths';
 
 	// ── Types ──────────────────────────────────────────────────────
 	interface AnalyticsSummary {
@@ -114,56 +115,6 @@
 	function bestDay(list: TimelineStat[]): TimelineStat | null {
 		if (!list.length) return null;
 		return list.reduce((best, d) => (Number(d.revenue) > Number(best.revenue) ? d : best));
-	}
-
-	function formatDate(iso: string): string {
-		const [y, m, d] = iso.split('-');
-		const months = [
-			'Jan',
-			'Feb',
-			'Mar',
-			'Apr',
-			'May',
-			'Jun',
-			'Jul',
-			'Aug',
-			'Sep',
-			'Oct',
-			'Nov',
-			'Dec'
-		];
-		return `${months[parseInt(m) - 1]} ${parseInt(d)}, ${y}`;
-	}
-
-	function formatDateShort(iso: string): string {
-		const [, m, d] = iso.split('-');
-		const months = [
-			'Jan',
-			'Feb',
-			'Mar',
-			'Apr',
-			'May',
-			'Jun',
-			'Jul',
-			'Aug',
-			'Sep',
-			'Oct',
-			'Nov',
-			'Dec'
-		];
-		return `${months[parseInt(m) - 1]} ${parseInt(d)}`;
-	}
-
-	function formatDateTime(iso: string): string {
-		const d = new Date(iso);
-		return d.toLocaleString('en-IN', {
-			month: 'short',
-			day: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit',
-			hour12: true,
-			timeZone: 'Asia/Kolkata'
-		});
 	}
 
 	function rangeParams(range: RangeKey, sd: string, ed: string): string {
@@ -275,41 +226,28 @@
 
 <div class="min-h-screen bg-background pb-20 text-foreground">
 	<!-- ── Sticky header ────────────────────────────────────────── -->
-	<header class="sticky top-0 z-20 border-b border-muted/20 bg-background/80 backdrop-blur-md">
-		<div class="flex h-14 items-center gap-3 px-4">
-			<a
-				href={resolve('/admin')}
-				class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted/40 text-foreground/60 transition-all hover:bg-muted/70 active:scale-90"
-			>
-				<ArrowLeft size={15} strokeWidth={2.5} />
-			</a>
-			<div class="min-w-0 flex-1">
-				{#if meta}
-					<p class="truncate text-[13px] font-bold tracking-tight">{meta.name}</p>
-					<p class="text-[10px] font-semibold tracking-widest text-foreground/40 uppercase">
-						Analytics
-					</p>
-				{:else}
-					<p class="text-[13px] font-bold tracking-tight">Analytics</p>
-				{/if}
-			</div>
-		</div>
+	<AdminHeader
+		backHref={resolve('/(admin)/admin')}
+		title={meta ? meta.name : 'Analytics'}
+		subtitle={meta ? 'Analytics' : undefined}
+	/>
 
-		<!-- Range pills -->
-		<div class="flex scrollbar-none gap-1 overflow-x-auto px-4 pb-3">
-			{#each RANGES as r (r.key)}
-				<button
-					onclick={() => handleRangeChange(r.key)}
-					class="shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-bold tracking-wider uppercase transition-all
-						{currentRange === r.key
-						? 'bg-foreground text-background'
-						: 'bg-muted/30 text-foreground/50 hover:bg-muted/50 hover:text-foreground/80'}"
-				>
-					{r.label}
-				</button>
-			{/each}
-		</div>
-	</header>
+	<!-- Range pills -->
+	<div
+		class="sticky top-16 z-20 flex scrollbar-none gap-1 overflow-x-auto border-b border-muted/20 bg-background/80 px-4 pt-2 pb-3 backdrop-blur-md"
+	>
+		{#each RANGES as r (r.key)}
+			<button
+				onclick={() => handleRangeChange(r.key)}
+				class="shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-bold tracking-wider uppercase transition-all
+					{currentRange === r.key
+					? 'bg-foreground text-background'
+					: 'bg-muted/30 text-foreground/50 hover:bg-muted/50 hover:text-foreground/80'}"
+			>
+				{r.label}
+			</button>
+		{/each}
+	</div>
 
 	<!-- ── Page body ─────────────────────────────────────────────── -->
 	<div class="flex flex-col gap-3 px-4 pt-4">
@@ -584,9 +522,7 @@
 			{:else if activeTab === 'orders'}
 				<!-- Skeleton -->
 				{#if ordersLoading && orders.length === 0}
-					{#each [0, 1, 2, 3, 4] as _ (_)}
-						<div class="h-18 animate-pulse rounded-xl bg-muted/20"></div>
-					{/each}
+					<CardSkeleton type="menuOrder" count={4} />
 
 					<!-- Error -->
 				{:else if ordersError && orders.length === 0}

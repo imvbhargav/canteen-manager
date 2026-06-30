@@ -3,15 +3,20 @@ import { db } from '$lib/server/db';
 import { users } from '$lib/server/db/schema';
 import { and, lt, desc, or, ilike, not, eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
+import {
+	requireUser,
+	getPaginationParams,
+	processPagination,
+	handleServerError
+} from '$lib/server/api';
 
 export const GET: RequestHandler = async ({ locals, url }) => {
-	if (!locals.user) {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const userAuth = requireUser(locals);
+	if (!userAuth.authenticated) {
+		return userAuth.response!;
 	}
 
-	const limitParam = parseInt(url.searchParams.get('limit') || '15', 10);
-	const limit = limitParam > 0 && limitParam <= 50 ? limitParam : 15;
-	const cursor = url.searchParams.get('cursor');
+	const { limit, cursor } = getPaginationParams(url, 15);
 	const search = url.searchParams.get('search');
 	const status = url.searchParams.get('status');
 
@@ -61,15 +66,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			}
 		});
 
-		let nextCursor: string | null = null;
-		let hasNextPage = false;
-
-		if (userRecords.length > limit) {
-			hasNextPage = true;
-			userRecords.pop();
-			const lastItem = userRecords[userRecords.length - 1];
-			nextCursor = lastItem.createdAt.toISOString();
-		}
+		const { hasNextPage, nextCursor } = processPagination(userRecords, limit);
 
 		return json({
 			success: true,
@@ -79,7 +76,6 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			}
 		});
 	} catch (error) {
-		console.error('Failed to fetch users:', error);
-		return json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+		return handleServerError(error, 'Failed to fetch users');
 	}
 };

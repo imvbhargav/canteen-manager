@@ -4,6 +4,7 @@ import { users, loginAttempts } from '$lib/server/db/schema'; // Import loginAtt
 import { eq, and, sql, count } from 'drizzle-orm';
 import { hashPin, verifyPin } from '$lib/server/auth';
 import type { RequestHandler } from './$types';
+import { requireUser, handleServerError } from '$lib/server/api';
 
 // Rate Limiting Configuration
 const MAX_ATTEMPTS = 5;
@@ -11,12 +12,13 @@ const LOCKOUT_HOURS = 1;
 
 export const POST: RequestHandler = async ({ request, locals, getClientAddress }) => {
 	// Ensure user is authenticated
-	if (!locals.user) {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const userAuth = requireUser(locals);
+	if (!userAuth.authenticated) {
+		return userAuth.response!;
 	}
 
 	try {
-		const userId = locals.user.id;
+		const userId = userAuth.user!.id;
 		const clientIp = getClientAddress();
 
 		// Create a unique identifier for this specific action
@@ -84,7 +86,6 @@ export const POST: RequestHandler = async ({ request, locals, getClientAddress }
 
 		return json({ success: true, message: 'PIN updated successfully' });
 	} catch (error: unknown) {
-		console.error('Failed to update PIN:', error);
-		return json({ success: false, error: 'Internal server error' }, { status: 500 });
+		return handleServerError(error, 'Failed to update PIN', 'Internal server error');
 	}
 };

@@ -6,6 +6,7 @@ import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 import { decryptCounterData } from '$lib/crypto';
 import Pusher from 'pusher';
+import { requireUser, isEngineAlive, handleCheckoutError } from '$lib/server/api';
 
 const pusher: Pusher = new Pusher({
 	appId: env.PUSHER_APP_ID as string,
@@ -36,11 +37,12 @@ interface ReceiptItem {
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	if (!locals.user) {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const userAuth = requireUser(locals);
+	if (!userAuth.authenticated) {
+		return userAuth.response!;
 	}
 
-	const userId: string = locals.user.id;
+	const userId: string = userAuth.user!.id;
 
 	const { cart, securePayload } = (await request.json()) as {
 		cart: CartItem[];
@@ -92,13 +94,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ success: false, error: reason }, { status: 400 });
 		}
 
-		const FIVE_MINUTES_IN_MS = 5 * 60 * 1000;
-		const lastPingTime = activeEngine?.lastPingedAt
-			? new Date(activeEngine.lastPingedAt).getTime()
-			: 0;
-		const isEngineDead = Date.now() - lastPingTime > FIVE_MINUTES_IN_MS;
-
-		if (!activeEngine || isEngineDead) {
+		if (!activeEngine || !isEngineAlive(activeEngine.lastPingedAt)) {
 			return json(
 				{
 					success: false,
@@ -174,18 +170,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 		});
 	} catch (error: unknown) {
-		const errorMessage: string = error instanceof Error ? error.message : 'Unknown error occurred';
-
-		if (errorMessage.includes('users_balance_check')) {
-			return json({ success: false, error: 'Insufficient funds' }, { status: 402 });
-		}
-		if (errorMessage.includes('Item is currently out of stock')) {
-			return json(
-				{ success: false, error: 'An item in your cart went out of stock' },
-				{ status: 409 }
-			);
-		}
-
-		return json({ success: false, error: errorMessage || 'Checkout failed' }, { status: 500 });
+		return handleCheckoutError(error, 500, 'Checkout failed');
 	}
 };

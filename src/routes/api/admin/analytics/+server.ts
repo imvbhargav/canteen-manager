@@ -1,19 +1,16 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { tickets, ticketItems, menuItems, users } from '$lib/server/db/schema';
+import { tickets, ticketItems, menuItems } from '$lib/server/db/schema';
 import { eq, and, gte, lte, not, sql, desc } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
+import { requireAdmin, handleServerError } from '$lib/server/api';
 
 export const GET: RequestHandler = async ({ locals, url }) => {
-	if (!locals.user) return json({ success: false, error: 'Unauthorized' }, { status: 401 });
-
-	const adminCheck = await db.query.users.findFirst({
-		where: eq(users.id, locals.user.id),
-		columns: { role: true }
+	const auth = await requireAdmin(locals, {
+		adminStatus: 403
 	});
-
-	if (!adminCheck || adminCheck.role !== 'ADMIN') {
-		return json({ success: false, error: 'Unauthorized' }, { status: 403 });
+	if (!auth.authorized) {
+		return auth.response!;
 	}
 
 	try {
@@ -210,7 +207,6 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			}
 		});
 	} catch (error) {
-		console.error('Analytics Fetch Error:', error);
-		return json({ success: false, error: 'Failed to generate analytics' }, { status: 500 });
+		return handleServerError(error, 'Analytics Fetch Error', 'Failed to generate analytics');
 	}
 };

@@ -3,10 +3,12 @@ import { db } from '$lib/server/db';
 import { users } from '$lib/server/db/schema';
 import { count, eq, not, sum } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
+import { requireUser, handleServerError } from '$lib/server/api';
 
 export const GET: RequestHandler = async ({ locals }) => {
-	if (!locals.user) {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const userAuth = requireUser(locals);
+	if (!userAuth.authenticated) {
+		return userAuth.response!;
 	}
 
 	try {
@@ -28,7 +30,6 @@ export const GET: RequestHandler = async ({ locals }) => {
 			}
 		});
 	} catch (error) {
-		console.error('Failed to fetch user dashboard stats:', error);
-		return json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+		return handleServerError(error, 'Failed to fetch user dashboard stats');
 	}
 };

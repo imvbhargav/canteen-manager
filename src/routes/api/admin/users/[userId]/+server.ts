@@ -3,17 +3,13 @@ import { db } from '$lib/server/db';
 import { users } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
+import { requireAdmin, handleServerError } from '$lib/server/api';
 
 export const GET: RequestHandler = async ({ locals, params }) => {
-	if (!locals.user) return json({ success: false, error: 'Unauthorized' }, { status: 401 });
-
-	// Verify Admin Role
-	const adminCheck = await db.query.users.findFirst({
-		where: eq(users.id, locals.user.id),
-		columns: { role: true }
-	});
-	if (!adminCheck || adminCheck.role !== 'ADMIN')
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const auth = await requireAdmin(locals);
+	if (!auth.authorized) {
+		return auth.response!;
+	}
 
 	try {
 		const targetUser = await db.query.users.findFirst({
@@ -24,7 +20,6 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 
 		return json({ success: true, data: targetUser });
 	} catch (error) {
-		console.error('Failed to fetch user:', error);
-		return json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+		return handleServerError(error, 'Failed to fetch user');
 	}
 };

@@ -2,17 +2,10 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import AppLogo from '$lib/components/AppLogo.svelte';
-	import { formatCurrencyINR } from '$lib';
-	import {
-		Search,
-		Loader2,
-		LogOut,
-		ShieldCheck,
-		User as UserIcon,
-		Users,
-		Wallet
-	} from 'lucide-svelte';
+	import { Search, ShieldCheck, User as UserIcon, Users, Wallet } from 'lucide-svelte';
+	import { formatCurrencyINR, getInitials } from '$lib';
+	import AdminHeader from '$lib/components/AdminHeader.svelte';
+	import CardSkeleton from '$lib/components/CardSkeleton.svelte';
 
 	type UserRecord = {
 		id: string;
@@ -28,7 +21,6 @@
 	let usersList: UserRecord[] = $state([]);
 	let isLoading: boolean = $state(true);
 	let isLoadingMore: boolean = $state(false);
-	let isLoggingOut: boolean = $state(false);
 
 	// Stats State Variables
 	let totalUsers: number = $state(0);
@@ -114,38 +106,10 @@
 		fetchUsers(nextCursor);
 	}
 
-	async function handleLogout(): Promise<void> {
-		if (isLoggingOut) return;
-		isLoggingOut = true;
-
-		try {
-			const res: Response = await fetch('/api/auth/logout', { method: 'POST' });
-			if (res.ok) {
-				goto(resolve('/login'));
-			} else {
-				console.error('Logout failed');
-				isLoggingOut = false;
-			}
-		} catch {
-			console.error('Network error during logout');
-			isLoggingOut = false;
-		}
-	}
-
 	onMount(() => {
 		fetchStats(); // Fetch totals numbers
 		fetchUsers(null, true);
 	});
-
-	// Helper to get initials
-	function getInitials(name: string) {
-		return name
-			.split(' ')
-			.map((n) => n[0])
-			.join('')
-			.toUpperCase()
-			.substring(0, 2);
-	}
 
 	function navigateToUser(id: string) {
 		goto(resolve('/(admin)/admin/users/[userId]', { userId: id }));
@@ -155,34 +119,7 @@
 <svelte:head><title>Users | MunchUp Admin</title></svelte:head>
 
 <div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
-	<header
-		class="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-3 bg-background/15 px-5 backdrop-blur-md"
-	>
-		<div>
-			<AppLogo />
-		</div>
-		<div class="flex items-center justify-end gap-3">
-			<div
-				class="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-600"
-			>
-				<div class="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
-				<span class="text-[9px] font-bold tracking-widest uppercase">Online</span>
-			</div>
-
-			<button
-				onclick={handleLogout}
-				disabled={isLoggingOut}
-				class="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90 disabled:opacity-50"
-				title="Log Out"
-			>
-				{#if isLoggingOut}
-					<Loader2 size={16} strokeWidth={2.5} class="animate-spin" />
-				{:else}
-					<LogOut size={16} strokeWidth={2.5} />
-				{/if}
-			</button>
-		</div>
-	</header>
+	<AdminHeader showLogout />
 
 	<div class="flex-1 space-y-6 overflow-y-auto px-5 pt-4 pb-10">
 		<div class="space-y-4">
@@ -279,18 +216,7 @@
 
 		<div class="space-y-3">
 			{#if isLoading}
-				{#each Array.from({ length: 5 }, (_, i) => i) as i (i)}
-					<div
-						class="flex animate-pulse items-center gap-4 rounded-[20px] border border-muted/30 bg-card p-4"
-					>
-						<div class="h-12 w-12 rounded-full bg-muted/40"></div>
-						<div class="flex-1 space-y-2">
-							<div class="h-4 w-32 rounded-full bg-muted/60"></div>
-							<div class="h-3 w-20 rounded-full bg-muted/40"></div>
-						</div>
-						<div class="h-5 w-16 rounded-full bg-muted/60"></div>
-					</div>
-				{/each}
+				<CardSkeleton type="user" count={5} />
 			{:else if usersList.length > 0}
 				{#each usersList as user (user.id)}
 					<button

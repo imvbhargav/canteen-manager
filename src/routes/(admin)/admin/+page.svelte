@@ -3,7 +3,6 @@
 	import {
 		CheckCircle2,
 		Loader2,
-		LogOut,
 		Plus,
 		Search,
 		Edit,
@@ -14,9 +13,9 @@
 		AlertCircle,
 		BarChart3
 	} from 'lucide-svelte';
+	import AdminHeader from '$lib/components/AdminHeader.svelte';
+	import CardSkeleton from '$lib/components/CardSkeleton.svelte';
 	import { resolve } from '$app/paths';
-	import { goto } from '$app/navigation';
-	import AppLogo from '$lib/components/AppLogo.svelte';
 
 	interface MenuItem {
 		id: string;
@@ -89,7 +88,6 @@
 		dietary: ''
 	});
 	let isEditSubmitting: boolean = $state(false);
-	let isLoggingOut: boolean = $state(false);
 
 	onMount(() => {
 		fetchMenuItems(true);
@@ -107,24 +105,6 @@
 			console.error('Failed to fetch menu items');
 		} finally {
 			if (showSkeleton) isFetchingMenu = false;
-		}
-	}
-
-	async function handleLogout(): Promise<void> {
-		if (isLoggingOut) return;
-		isLoggingOut = true;
-
-		try {
-			const res: Response = await fetch('/api/auth/logout', { method: 'POST' });
-			if (res.ok) {
-				goto(resolve('/login'));
-			} else {
-				console.error('Logout failed');
-				isLoggingOut = false;
-			}
-		} catch {
-			console.error('Network error during logout');
-			isLoggingOut = false;
 		}
 	}
 
@@ -364,35 +344,7 @@
 {/if}
 
 <div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
-	<header
-		class="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-3 bg-background/15 px-5 backdrop-blur-md"
-	>
-		<div>
-			<AppLogo />
-		</div>
-
-		<div class="flex items-center justify-end gap-3">
-			<div
-				class="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-600"
-			>
-				<div class="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
-				<span class="text-[9px] font-bold tracking-widest uppercase">Online</span>
-			</div>
-
-			<button
-				onclick={handleLogout}
-				disabled={isLoggingOut}
-				class="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90 disabled:opacity-50"
-				title="Log Out"
-			>
-				{#if isLoggingOut}
-					<Loader2 size={16} strokeWidth={2.5} class="animate-spin" />
-				{:else}
-					<LogOut size={16} strokeWidth={2.5} />
-				{/if}
-			</button>
-		</div>
-	</header>
+	<AdminHeader showLogout />
 
 	<div class="flex-1 space-y-6 px-5 pt-4">
 		<div class="flex items-center justify-between">
@@ -548,21 +500,7 @@
 
 			<div class="space-y-3 pb-10">
 				{#if isFetchingMenu}
-					{#each Array.from({ length: 4 }, (_, i) => i) as i (i)}
-						<div
-							class="flex animate-pulse items-center gap-3 rounded-2xl border border-muted/30 bg-card p-4"
-						>
-							<div class="flex-1 space-y-2.5">
-								<div class="h-4 w-32 rounded-full bg-muted/60"></div>
-								<div class="h-3 w-3/4 rounded-full bg-muted/40"></div>
-								<div class="h-4 w-16 rounded-full bg-muted/60"></div>
-							</div>
-							<div class="flex gap-2">
-								<div class="h-8 w-8 rounded-full bg-muted/40"></div>
-								<div class="h-8 w-8 rounded-full bg-muted/40"></div>
-							</div>
-						</div>
-					{/each}
+					<CardSkeleton type="menu" count={4} />
 				{:else if filteredMenu.length === 0}
 					<div class="rounded-2xl border border-muted/25 bg-card py-10 text-center">
 						<p class="text-[13px] font-medium text-foreground/40">No items found in this view.</p>

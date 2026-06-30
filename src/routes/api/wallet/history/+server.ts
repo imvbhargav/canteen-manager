@@ -3,18 +3,23 @@ import { db } from '$lib/server/db';
 import { walletTransactions } from '$lib/server/db/schema';
 import { eq, and, lt, desc, sql } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
+import {
+	requireUser,
+	getPaginationParams,
+	processPagination,
+	handleServerError
+} from '$lib/server/api';
 
 export const GET: RequestHandler = async ({ locals, url }) => {
-	if (!locals.user) {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const userAuth = requireUser(locals);
+	if (!userAuth.authenticated) {
+		return userAuth.response!;
 	}
 
-	const userId = locals.user.id;
+	const userId = userAuth.user!.id;
 
 	// Parse Pagination Params
-	const limitParam = parseInt(url.searchParams.get('limit') || '15', 10);
-	const limit = limitParam > 0 && limitParam <= 50 ? limitParam : 15;
-	const cursor = url.searchParams.get('cursor');
+	const { limit, cursor } = getPaginationParams(url, 15);
 
 	try {
 		// Fetch Aggregate Statistics (Total Added, Total Spent)
@@ -56,15 +61,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		});
 
 		// Resolve Next Cursor
-		let nextCursor: string | null = null;
-		let hasNextPage = false;
-
-		if (transactions.length > limit) {
-			hasNextPage = true;
-			transactions.pop(); // Remove the extra checking item
-			const lastItem = transactions[transactions.length - 1];
-			nextCursor = lastItem.createdAt.toISOString();
-		}
+		const { hasNextPage, nextCursor } = processPagination(transactions, limit);
 
 		return json({
 			success: true,
@@ -79,7 +76,6 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			}
 		});
 	} catch (error) {
-		console.error('Failed to fetch history:', error);
-		return json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+		return handleServerError(error, 'Failed to fetch history');
 	}
 };

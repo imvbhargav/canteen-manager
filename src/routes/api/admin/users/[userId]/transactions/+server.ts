@@ -1,22 +1,22 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { walletTransactions, users } from '$lib/server/db/schema';
+import { walletTransactions } from '$lib/server/db/schema';
 import { eq, and, lt, desc } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
+import {
+	requireAdmin,
+	getPaginationParams,
+	processPagination,
+	handleServerError
+} from '$lib/server/api';
 
 export const GET: RequestHandler = async ({ locals, params, url }) => {
-	if (!locals.user) return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const auth = await requireAdmin(locals);
+	if (!auth.authorized) {
+		return auth.response!;
+	}
 
-	const adminCheck = await db.query.users.findFirst({
-		where: eq(users.id, locals.user.id),
-		columns: { role: true }
-	});
-	if (!adminCheck || adminCheck.role !== 'ADMIN')
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
-
-	const limitParam = parseInt(url.searchParams.get('limit') || '15', 10);
-	const limit = limitParam > 0 && limitParam <= 50 ? limitParam : 15;
-	const cursor = url.searchParams.get('cursor');
+	const { limit, cursor } = getPaginationParams(url, 15);
 
 	try {
 		let whereClause = eq(walletTransactions.userId, params.userId);
@@ -30,22 +30,13 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 			limit: limit + 1
 		});
 
-		let nextCursor: string | null = null;
-		let hasNextPage = false;
-
-		if (transactions.length > limit) {
-			hasNextPage = true;
-			transactions.pop();
-			const lastItem = transactions[transactions.length - 1];
-			nextCursor = lastItem.createdAt.toISOString();
-		}
+		const { hasNextPage, nextCursor } = processPagination(transactions, limit);
 
 		return json({
 			success: true,
 			data: { transactions, pagination: { nextCursor, hasNextPage, limit } }
 		});
 	} catch (error) {
-		console.error('Failed to fetch transactions:', error);
-		return json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+		return handleServerError(error, 'Failed to fetch transactions');
 	}
 };

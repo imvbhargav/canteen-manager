@@ -1,36 +1,9 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { formatCurrencyINR } from '$lib';
-	import { ArrowLeft, ReceiptText, Clock, CheckCircle2, XCircle, Utensils } from 'lucide-svelte';
-
-	type MenuItem = {
-		id: string;
-		name: string;
-		description: string;
-		price: string;
-		category: string;
-		inStock: boolean;
-		dietary: string;
-		isArchived: boolean;
-	};
-
-	type TicketItem = {
-		id: string;
-		quantity: number;
-		unitPrice: string;
-		menuItem: MenuItem;
-	};
-
-	type Ticket = {
-		id: string;
-		ticketReference: string;
-		totalAmount: string;
-		status: 'PENDING' | 'READY' | 'COMPLETED' | 'CANCELLED';
-		createdAt: string;
-		items: TicketItem[];
-		formattedDate?: string;
-		totalItems?: number;
-	};
+	import { formatCurrencyINR, getStatusConfig } from '$lib';
+	import type { APITicket, APITicketItem } from '$lib/types';
+	import SubPageHeader from '$lib/components/SubPageHeader.svelte';
+	import DietaryIcon from '$lib/components/DietaryIcon.svelte';
 
 	type Stats = {
 		total: number;
@@ -40,7 +13,7 @@
 		CANCELLED: number;
 	};
 
-	let orders: Ticket[] = $state([]);
+	let orders: APITicket[] = $state([]);
 	let stats: Stats = $state({ total: 0, PENDING: 0, READY: 0, COMPLETED: 0, CANCELLED: 0 });
 
 	let isLoadingOrders = $state(true);
@@ -49,21 +22,7 @@
 	let nextCursor: string | null = $state(null);
 	let hasNextPage = $state(false);
 
-	// Helper to get the correct icon and colors based on status
-	function getStatusConfig(status: string) {
-		switch (status) {
-			case 'COMPLETED':
-				return { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-500/10' };
-			case 'READY':
-				return { icon: Utensils, color: 'text-blue-600', bg: 'bg-blue-500/10' };
-			case 'PENDING':
-				return { icon: Clock, color: 'text-amber-600', bg: 'bg-amber-500/10' };
-			case 'CANCELLED':
-				return { icon: XCircle, color: 'text-destructive', bg: 'bg-destructive/10' };
-			default:
-				return { icon: ReceiptText, color: 'text-foreground/50', bg: 'bg-muted/50' };
-		}
-	}
+
 
 	async function fetchOrders(cursor: string | null = null) {
 		const url = new URL('/api/orders', window.location.origin);
@@ -75,7 +34,7 @@
 			const data = await res.json();
 
 			if (data.success) {
-				const formattedTickets = data.data.tickets.map((t: Ticket) => {
+				const formattedTickets = data.data.tickets.map((t: APITicket) => {
 					const d = new Date(t.createdAt);
 					return {
 						...t,
@@ -116,20 +75,7 @@
 <div
 	class="animate-in fade-in absolute inset-0 z-20 flex flex-col overflow-y-auto bg-background duration-300"
 >
-	<header
-		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
-	>
-		<a
-			href={resolve('/')}
-			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
-		>
-			<ArrowLeft size={18} strokeWidth={2.5} />
-		</a>
-
-		<h2 class="flex-1 text-[20px] font-bold tracking-tight text-foreground">My Orders</h2>
-
-		<div class="flex w-20 justify-end"></div>
-	</header>
+	<SubPageHeader title="My Orders" />
 
 	<div class="space-y-5 px-5 pt-1 pb-10">
 		<div
@@ -245,18 +191,7 @@
 													<span class="font-bold text-foreground/40">{item.quantity}x</span>
 													<div class="mt-0.5 flex items-center gap-1.5">
 														{#if item.menuItem}
-															<div
-																class="flex h-3 w-3 shrink-0 items-center justify-center self-center rounded-[2px] border {item
-																	.menuItem.dietary === 'veg'
-																	? 'border-emerald-500/70'
-																	: 'border-red-500/70'}"
-															>
-																<div
-																	class="h-1.5 w-1.5 rounded-full {item.menuItem.dietary === 'veg'
-																		? 'bg-emerald-500/70'
-																		: 'bg-red-500/70'}"
-																></div>
-															</div>
+															<DietaryIcon dietary={item.menuItem.dietary} class="self-center" />
 															<span class="font-medium">{item.menuItem.name}</span>
 														{:else}
 															<span class="font-medium text-foreground/50">Unknown Item</span>

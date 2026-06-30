@@ -5,22 +5,12 @@ import qr from 'qr-image';
 import type { RequestHandler } from './$types';
 import { encryptCounterId } from '$lib/crypto';
 import { eq } from 'drizzle-orm';
-import { users } from '$lib/server/db/schema';
+import { requireAdmin, handleServerError } from '$lib/server/api';
 
 export const GET: RequestHandler = async ({ locals, url }) => {
-	if (!locals.user) {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const user = await db.query.users.findFirst({
-		where: eq(users.id, locals.user.id),
-		columns: {
-			role: true
-		}
-	});
-
-	if (!user || user.role !== 'ADMIN') {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const auth = await requireAdmin(locals);
+	if (!auth.authorized) {
+		return auth.response!;
 	}
 
 	// Check if a specific counter ID was requested
@@ -65,7 +55,10 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 
 		return json({ success: true, counters: counterQrs });
 	} catch (error: unknown) {
-		console.error('Serverless QR generation failed:', error);
-		return json({ success: false, error: 'Failed to generate counter QR codes' }, { status: 500 });
+		return handleServerError(
+			error,
+			'Serverless QR generation failed',
+			'Failed to generate counter QR codes'
+		);
 	}
 };

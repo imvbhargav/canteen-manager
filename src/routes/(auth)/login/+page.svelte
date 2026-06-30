@@ -16,6 +16,7 @@
 	import { page } from '$app/stores';
 	import { onMount, untrack } from 'svelte';
 	import AppLogo from '$lib/components/AppLogo.svelte';
+	import { sanitizeAlphanumeric } from '$lib';
 
 	interface SavedProfile {
 		identifier: string;
@@ -51,19 +52,11 @@
 	let currentScreen: Screen = $state('profiles');
 
 	onMount(() => {
-		const setHeight = () => {
-			document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
-		};
-		setHeight();
-		window.addEventListener('resize', setHeight);
-
 		loadProfiles();
 
 		if (isSwitching) {
 			currentScreen = 'full';
 		}
-
-		return () => window.removeEventListener('resize', setHeight);
 	});
 
 	function loadProfiles(): void {
@@ -105,6 +98,7 @@
 			/* quota or private mode */
 		}
 		profileToRemove = null;
+		userRequestedProfiles = true;
 
 		if (savedProfiles.length === 0) {
 			isEditingProfiles = false;
@@ -144,8 +138,7 @@
 	// Sanitize alphanumeric keyboard entries
 	function handlePinInput(e: Event) {
 		const target = e.target as HTMLInputElement;
-		// Strip everything that isn't letters or numbers
-		pin = target.value.replace(/[^a-zA-Z0-9]/g, '');
+		pin = sanitizeAlphanumeric(target.value);
 	}
 
 	type LoginResponse = {

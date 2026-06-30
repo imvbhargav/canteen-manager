@@ -2,10 +2,10 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { engines } from '$lib/server/db/schema';
 import { eq, ne, and } from 'drizzle-orm';
+import { verifyEngineToken, isEngineAlive, handleServerError } from '$lib/server/api';
 
 export const POST: RequestHandler = async ({ request }) => {
-	const engineToken = request.headers.get('X-Engine-Token');
-	if (engineToken !== '38d6960a32cda66ce327d44d358755f706420303e11825a34eca38544a07e2c7') {
+	if (!verifyEngineToken(request)) {
 		return json({ success: false, error: 'Unauthorized hub execution access' }, { status: 401 });
 	}
 
@@ -24,10 +24,11 @@ export const POST: RequestHandler = async ({ request }) => {
 				.where(eq(engines.id, engineId));
 
 			return json({ success: true, message: 'Engine state detached successfully.' });
-		} catch {
-			return json(
-				{ success: false, error: 'Internal shutdown processing failure.' },
-				{ status: 500 }
+		} catch (error) {
+			return handleServerError(
+				error,
+				'Engine disconnect failed',
+				'Internal shutdown processing failure.'
 			);
 		}
 	}
@@ -47,11 +48,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			});
 
 			if (currentActiveEngine) {
-				const FIVE_MINUTES_IN_MS = 5 * 60 * 1000;
-				const lastPingTime = new Date(currentActiveEngine.lastPingedAt).getTime();
-				const isCurrentEngineAlive = Date.now() - lastPingTime < FIVE_MINUTES_IN_MS;
-
-				if (isCurrentEngineAlive && currentActiveEngine.priority > priority) {
+				if (
+					isEngineAlive(currentActiveEngine.lastPingedAt) &&
+					currentActiveEngine.priority > priority
+				) {
 					tx.rollback();
 					return json(
 						{
@@ -92,9 +92,10 @@ export const POST: RequestHandler = async ({ request }) => {
 				{ status: 409 }
 			);
 		}
-		return json(
-			{ success: false, error: 'Internal engine synchronization failure.' },
-			{ status: 500 }
+		return handleServerError(
+			err,
+			'Engine registration/heartbeat failed',
+			'Internal engine synchronization failure.'
 		);
 	}
 };

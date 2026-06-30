@@ -5,7 +5,6 @@
 	import { goto } from '$app/navigation';
 	import { formatCurrencyINR } from '$lib';
 	import {
-		ChevronLeft,
 		RefreshCw,
 		BadgeCheck,
 		BadgeX,
@@ -14,6 +13,7 @@
 		CircleAlert,
 		CalendarDays
 	} from 'lucide-svelte';
+	import AdminHeader from '$lib/components/AdminHeader.svelte';
 
 	type UserProfile = {
 		id: string;
@@ -137,36 +137,31 @@
 <div
 	class="animate-in fade-in absolute inset-0 z-30 flex flex-col bg-background duration-200 select-none"
 >
-	<div class="flex shrink-0 items-center gap-3 border-b border-muted/30 bg-card px-4 py-3">
-		<button
-			onclick={() => goto(resolve(`/admin/users/${userId}`))}
-			class="flex h-8 w-8 items-center justify-center rounded-full bg-muted/40 text-foreground transition-transform active:scale-90"
-		>
-			<ChevronLeft size={17} strokeWidth={2.5} />
-		</button>
-
-		<div class="min-w-0 flex-1">
-			<p class="truncate text-[13px] font-bold text-foreground">Verification Controls</p>
-			<p class="truncate text-[10px] font-medium text-foreground/40">Identity & account status</p>
-		</div>
-
-		{#if targetUser}
-			<div
-				class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold
+	<AdminHeader
+		backHref={resolve('/(admin)/admin/users/[userId]', { userId: userId! })}
+		backType="chevron"
+		title="Verification Controls"
+		subtitle="Identity & account status"
+	>
+		{#snippet rightSnippet()}
+			{#if targetUser}
+				<div
+					class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold
                 {targetUser.isActive
-					? 'bg-emerald-500/10 text-emerald-600'
-					: 'bg-destructive/10 text-destructive'}"
-			>
-				{#if targetUser.isActive}
-					<BadgeCheck size={11} strokeWidth={2.5} />
-					<span>Active</span>
-				{:else}
-					<BadgeX size={11} strokeWidth={2.5} />
-					<span>Inactive</span>
-				{/if}
-			</div>
-		{/if}
-	</div>
+						? 'bg-emerald-500/10 text-emerald-600'
+						: 'bg-destructive/10 text-destructive'}"
+				>
+					{#if targetUser.isActive}
+						<BadgeCheck size={11} strokeWidth={2.5} />
+						<span>Active</span>
+					{:else}
+						<BadgeX size={11} strokeWidth={2.5} />
+						<span>Inactive</span>
+					{/if}
+				</div>
+			{/if}
+		{/snippet}
+	</AdminHeader>
 
 	<div class="flex-1 overflow-y-auto px-5 pt-4">
 		{#if isLoading}

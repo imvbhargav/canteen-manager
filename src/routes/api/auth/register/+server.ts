@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { hashPin, generateSessionToken, hashSessionToken } from '$lib/server/auth';
 import { IMAGE_STORAGE_PROVIDER, R2_PUBLIC_DOMAIN } from '$env/static/private';
 import type { RequestHandler } from './$types';
+import { handleServerError } from '$lib/server/api';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	try {
@@ -109,7 +110,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
 		return json({ success: true, message: 'Account registered and awaiting admin activation' });
 	} catch (error: unknown) {
-		console.error('Registration error:', error);
-		return json({ success: false, error: 'Failed to create account' }, { status: 500 });
+		return handleServerError(error, 'Registration error', 'Failed to create account');
 	}
 };

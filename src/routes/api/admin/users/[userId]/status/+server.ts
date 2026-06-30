@@ -3,13 +3,17 @@ import { db } from '$lib/server/db';
 import { users } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
+import { requireAdmin, handleServerError } from '$lib/server/api';
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
-	if (!locals.user || !locals.user.id) {
-		return json(
-			{ success: false, error: 'Unauthorized configuration profile context' },
-			{ status: 401 }
-		);
+	const auth = await requireAdmin(locals, {
+		userError: 'Unauthorized configuration profile context',
+		userStatus: 401,
+		adminError: 'Access denied. Administrative authorization required.',
+		adminStatus: 403
+	});
+	if (!auth.authorized) {
+		return auth.response!;
 	}
 
 	try {
@@ -21,18 +25,6 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			return json(
 				{ success: false, error: 'Target status state parameter required' },
 				{ status: 400 }
-			);
-		}
-
-		const adminCheck = await db.query.users.findFirst({
-			where: eq(users.id, locals.user.id),
-			columns: { role: true }
-		});
-
-		if (!adminCheck || adminCheck.role !== 'ADMIN') {
-			return json(
-				{ success: false, error: 'Access denied. Administrative authorization required.' },
-				{ status: 403 }
 			);
 		}
 
@@ -141,10 +133,10 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			return json({ success: true, data: updatedUser });
 		}
 	} catch (error) {
-		console.error('Status alternation processing hazard encountered:', error);
-		return json(
-			{ success: false, error: 'Internal system modification runtime exception' },
-			{ status: 500 }
+		return handleServerError(
+			error,
+			'Status alternation processing hazard encountered',
+			'Internal system modification runtime exception'
 		);
 	}
 };

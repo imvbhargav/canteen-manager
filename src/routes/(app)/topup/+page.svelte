@@ -2,7 +2,8 @@
 	import { resolve } from '$app/paths';
 	import { formatCurrencyINR } from '$lib';
 	import { appState } from '$lib/store.svelte';
-	import { ArrowLeft, AlertCircle } from 'lucide-svelte';
+	import { AlertCircle } from 'lucide-svelte';
+	import SubPageHeader from '$lib/components/SubPageHeader.svelte';
 
 	let amount: number = $state(0);
 	const presets: number[] = [50, 100, 200, 500];
@@ -14,20 +15,7 @@
 <svelte:head><title>Add Funds | MunchUp</title></svelte:head>
 
 <div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
-	<header
-		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
-	>
-		<a
-			href={resolve('/')}
-			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
-		>
-			<ArrowLeft size={18} strokeWidth={2.5} />
-		</a>
-
-		<h2 class="flex-1 text-[20px] font-bold tracking-tight text-foreground">Add Funds</h2>
-
-		<div class="flex w-20 justify-end"></div>
-	</header>
+	<SubPageHeader title="Add Funds" />
 
 	<div class="flex-1 space-y-5 px-5 pt-1">
 		<div

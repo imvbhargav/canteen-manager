@@ -4,20 +4,13 @@ import { users } from '$lib/server/db/schema';
 import { hashPin } from '$lib/server/auth'; // Sourced from your auth configuration utilities
 import type { RequestHandler } from './$types';
 import { eq } from 'drizzle-orm';
+import { requireAdmin, handleServerError } from '$lib/server/api';
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	// Guard: Ensure requester is logged in and is an Admin
-	if (!locals.user) {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
-	}
-
-	const adminCheck = await db.query.users.findFirst({
-		where: eq(users.id, locals.user.id),
-		columns: { role: true }
-	});
-
-	if (!adminCheck || adminCheck.role !== 'ADMIN') {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const auth = await requireAdmin(locals);
+	if (!auth.authorized) {
+		return auth.response!;
 	}
 
 	// Extract the target student's user ID from the payload
@@ -70,7 +63,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			defaultPin: rawDefaultPin // Returns the RAW unhashed 5 digits so the Admin can read it to the student
 		});
 	} catch (error) {
-		console.error('Admin PIN reset failed:', error);
-		return json({ success: false, error: 'Internal server error' }, { status: 500 });
+		return handleServerError(error, 'Admin PIN reset failed', 'Internal server error');
 	}
 };

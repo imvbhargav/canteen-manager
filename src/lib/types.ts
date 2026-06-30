@@ -29,3 +29,21 @@ export interface Ticket {
 }
 
 export type AppView = 'DASHBOARD' | 'MENU' | 'TOP_UP' | 'QR_TICKET' | 'PROFILE';
+
+export interface APITicketItem {
+	id: string;
+	quantity: number;
+	unitPrice: string;
+	menuItem: MenuItem;
+}
+
+export interface APITicket {
+	id: string;
+	ticketReference: string;
+	totalAmount: string;
+	status: 'PENDING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+	createdAt: string;
+	items: APITicketItem[];
+	formattedDate?: string;
+	totalItems?: number;
+}

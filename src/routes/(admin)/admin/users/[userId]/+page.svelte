@@ -5,7 +5,6 @@
 	import { goto } from '$app/navigation';
 	import { formatCurrencyINR } from '$lib';
 	import {
-		ArrowLeft,
 		Wallet,
 		CheckCircle2,
 		Loader2,
@@ -23,6 +22,8 @@
 		ChevronRight,
 		AlertCircle
 	} from 'lucide-svelte';
+	import AdminHeader from '$lib/components/AdminHeader.svelte';
+	import CardSkeleton from '$lib/components/CardSkeleton.svelte';
 
 	type UserProfile = {
 		id: string;
@@ -351,46 +352,11 @@
 <svelte:head><title>User Details | MunchUp Admin</title></svelte:head>
 
 <div class="animate-in fade-in absolute inset-0 z-20 flex flex-col bg-background duration-300">
-	<header
-		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
-	>
-		<button
-			onclick={() => goto(resolve('/admin/users'))}
-			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
-		>
-			<ArrowLeft size={18} strokeWidth={2.5} />
-		</button>
-		<h2 class="flex-1 text-[20px] font-bold tracking-tight text-foreground">User Overview</h2>
-	</header>
+	<AdminHeader backHref={resolve('/admin/users')} title="User Overview" />
 
 	<div class="flex-1 space-y-6 overflow-y-auto px-5 pt-2 pb-10">
 		{#if isLoadingUser}
-			<div
-				class="relative overflow-hidden rounded-3xl border border-muted/30 bg-card p-5 shadow-[0_2px_12px_rgb(0,0,0,0.04)]"
-			>
-				<div class="flex items-start justify-between gap-4">
-					<div class="w-full max-w-40 space-y-2">
-						<div class="h-5 w-4/5 animate-pulse rounded-md bg-muted/60"></div>
-						<div class="h-3 w-3/5 animate-pulse rounded-md bg-muted/40"></div>
-					</div>
-					<div class="h-7 w-18 shrink-0 animate-pulse rounded-full bg-muted/50"></div>
-				</div>
-
-				<div
-					class="mt-5 flex h-16.5 items-center justify-between rounded-xl border border-muted/20 bg-muted/10 p-4"
-				>
-					<div class="space-y-1.5">
-						<div class="h-3 w-16 animate-pulse rounded bg-muted/40"></div>
-						<div class="h-6 w-24 animate-pulse rounded-md bg-muted/60"></div>
-					</div>
-					<div class="h-8 w-32 animate-pulse rounded-full bg-muted/60"></div>
-				</div>
-
-				<div class="mt-4 flex gap-3 border-t border-muted/20 pt-4">
-					<div class="h-10.5 flex-1 animate-pulse rounded-xl bg-muted/40"></div>
-					<div class="h-10.5 w-28.5 animate-pulse rounded-xl bg-muted/40"></div>
-				</div>
-			</div>
+			<CardSkeleton type="overview" count={1} />
 		{:else if targetUser}
 			<div
 				class="relative overflow-hidden rounded-3xl border border-muted/30 bg-card p-5 shadow-[0_2px_12px_rgb(0,0_0,0.04)]"
@@ -428,7 +394,7 @@
 				<div
 					class="mt-5 flex items-center justify-between rounded-xl border border-muted/20 bg-muted/10"
 				>
-					<div class="p-4">
+					<div>
 						<p class="text-[10px] font-bold tracking-[0.15em] text-foreground/50 uppercase">
 							Current Balance
 						</p>
@@ -436,14 +402,6 @@
 							{formatCurrencyINR(Number(targetUser.balance))}
 						</p>
 					</div>
-					{#if targetUser.isActive}
-						<button
-							onclick={() => (activeTab = 'FUNDS')}
-							class="mr-4 flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[12px] font-bold text-background transition-transform active:scale-95"
-						>
-							<Wallet size={14} strokeWidth={2.5} /> Manage Funds
-						</button>
-					{/if}
 				</div>
 
 				<div class="mt-4 flex gap-3 border-t border-muted/20 pt-4">

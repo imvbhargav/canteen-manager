@@ -3,6 +3,7 @@ import { db } from '$lib/server/db';
 import { manualOrderOtps, tickets, ticketItems, menuItems, counters } from '$lib/server/db/schema';
 import type { RequestHandler } from './$types';
 import { eq, and, gt, inArray } from 'drizzle-orm';
+import { requireUser, handleCheckoutError } from '$lib/server/api';
 
 interface CartItem {
 	menuItemId: string;
@@ -16,11 +17,12 @@ interface ValidatedItem {
 }
 
 export const POST: RequestHandler = async ({ locals, request }) => {
-	if (!locals.user) {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const userAuth = requireUser(locals);
+	if (!userAuth.authenticated) {
+		return userAuth.response!;
 	}
 
-	const activeUserId = locals.user.id;
+	const activeUserId = userAuth.user!.id;
 
 	const { otpCode, items } = (await request.json()) as {
 		otpCode: string;
@@ -118,20 +120,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			}
 		});
 	} catch (error: unknown) {
-		console.error('Manual order processing failed:', error);
-		const errorMessage = error instanceof Error ? error.message : 'Failed to process order';
-
-		// Catch error hooks safely bubbling up from trigger exceptions
-		if (errorMessage.includes('users_balance_check')) {
-			return json({ success: false, error: 'Insufficient wallet balance.' }, { status: 402 });
-		}
-		if (errorMessage.includes('Item is currently out of stock')) {
-			return json(
-				{ success: false, error: 'An item in your cart went out of stock.' },
-				{ status: 409 }
-			);
-		}
-
-		return json({ success: false, error: errorMessage }, { status: 400 });
+		return handleCheckoutError(error, 400, 'Manual order processing failed');
 	}
 };

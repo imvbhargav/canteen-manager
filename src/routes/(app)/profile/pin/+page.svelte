@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { ArrowLeft, Loader2, CheckCircle, AlertCircle, User } from 'lucide-svelte';
+	import { Loader2, CheckCircle, AlertCircle, User } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { appState } from '$lib/store.svelte';
+	import { sanitizeAlphanumeric } from '$lib';
+	import SubPageHeader from '$lib/components/SubPageHeader.svelte';
 
 	let pinUpdateStatus: 'IDLE' | 'SAVING' | 'SUCCESS' = $state('IDLE');
 	let errorMessage: string | null = $state(null);
@@ -23,10 +25,9 @@
 		}
 	});
 
-	// Sanitization utility to strip spaces and non-alphanumeric characters instantly
 	function handlePinInput(e: Event, currentField: 'current' | 'new' | 'confirm') {
 		const target = e.target as HTMLInputElement;
-		const sanitized = target.value.replace(/[^a-zA-Z0-9]/g, '');
+		const sanitized = sanitizeAlphanumeric(target.value);
 
 		if (currentField === 'current') currentPin = sanitized;
 		if (currentField === 'new') newPin = sanitized;
@@ -68,20 +69,7 @@
 <div
 	class="animate-in fade-in absolute inset-0 z-20 flex flex-col overflow-y-auto bg-background duration-300"
 >
-	<header
-		class="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 bg-background/15 px-5 backdrop-blur-md"
-	>
-		<a
-			href={resolve('/profile')}
-			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-foreground transition-transform active:scale-90"
-		>
-			<ArrowLeft size={18} strokeWidth={2.5} />
-		</a>
-
-		<h2 class="flex-1 text-[20px] font-bold tracking-tight text-foreground">Change PIN</h2>
-
-		<div class="flex w-20 justify-end"></div>
-	</header>
+	<SubPageHeader title="Change PIN" backHref={resolve('/profile')} />
 
 	<div class="space-y-6 px-5 pt-3">
 		{#if appState.wallet}

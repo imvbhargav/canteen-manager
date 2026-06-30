@@ -3,13 +3,15 @@ import { db } from '$lib/server/db';
 import { userSessions } from '$lib/server/db/schema';
 import { and, eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
+import { requireUser, handleServerError } from '$lib/server/api';
 
 export const POST: RequestHandler = async ({ locals }) => {
-	if (!locals.user || !locals.sessionId) {
-		return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+	const userAuth = requireUser(locals);
+	if (!userAuth.authenticated) {
+		return userAuth.response!;
 	}
 
-	const userId = locals.user.id;
+	const userId = userAuth.user!.id;
 
 	try {
 		await db
@@ -22,13 +24,6 @@ export const POST: RequestHandler = async ({ locals }) => {
 			message: 'Successfully signed out of all other devices.'
 		});
 	} catch (error) {
-		console.error('Device logout failed:', error);
-		return json(
-			{
-				success: false,
-				error: 'Failed to sign out of other devices'
-			},
-			{ status: 500 }
-		);
+		return handleServerError(error, 'Device logout failed', 'Failed to sign out of other devices');
 	}
 };
